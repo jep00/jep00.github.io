@@ -1,0 +1,121 @@
+/* Portfolio website style sheet, Version 1 design */ 
+
+/*Fonts
+  Choose body font, currently Times and Arial;
+  Menlo for all code 
+*/
+
+
+@font-face {
+    font-family: "menlo";
+    src: url("Menlo-Regular.ttf");
+}
+
+html {
+    scroll-behavior: smooth;
+    scroll-padding: 175px;
+}
+
+body {
+    background-color: cornsilk;
+    margin: 0;
+    padding: 0;
+}
+
+.top {
+    margin-top: 0px;
+    max-width: 600px;
+    height: auto;
+    margin: auto;
+    padding-top: 0px;
+    overflow: hidden;
+    background-color: cornsilk;
+}
+.toptxt {
+    margin-left: 0;
+    position: fixed;
+    background-color: cornsilk;
+    width: 600px;
+    padding-top: 10px;
+}
+
+
+.container {
+    margin-top: 30px;
+    max-width: 600px;
+    height: auto;
+    margin: auto;
+    padding-top: 175px;
+    overflow: scroll;
+}
+.projectcontainer {
+    max-width: 575px;
+    height: auto;
+    margin-left: 25px;
+}
+.paracontainer {
+    max-width: 500px;
+    height: auto;
+    margin-left: 25px;
+}
+.footer{
+  background: blanchedalmond;
+  text-align: center;
+}
+h1{
+    color: lightseagreen;
+    text-align: right;
+    font-family: 'menlo', Arial, serif;
+    font-size: 50px;
+    font-style: normal;
+    font-weight: 900;
+    line-height: 50px;
+}
+h2{
+    color: maroon;
+    font-family: 'menlo', monospace;
+    font-size: 20px;
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 21px;
+    text-align: left;
+}
+h3{
+    color: maroon;
+    font-family: 'menlo', monospace;
+    font-size: 15px;
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 14px;
+    text-align: justify;
+}
+.bubble{
+    color: cornsilk;
+    background-color: maroon;
+    padding: 1px 5px;
+    margin-right: 2px;
+    display: inline;
+    text-decoration: none;
+    text-align: justify;
+
+}
+p{
+    font-family: 'Arial', 'Menlo', 'Times New Roman', monospace;
+    font-size: 15px;
+    color:darkslategrey;
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 300;
+    line-height: 17px;
+    text-align: justify;
+}
+a{
+    color: maroon;
+    text-decoration: none;
+}
+a:hover{
+    color: cornsilk;
+    background-color: maroon;
+}
