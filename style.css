@@ -110,7 +110,13 @@ h4{
     display: inline;
     text-decoration: none;
     text-align: justify;
-
+}
+.lang{
+  color: gold;
+  font-size: 13px;
+  background-color: cadetblue;
+  padding: 1px 3px;
+  margin-right:2px;
 }
 p{
     font-family: 'Arial', 'Menlo', 'Times New Roman', monospace;
@@ -121,6 +127,14 @@ p{
     font-weight: 300;
     line-height: 17px;
     text-align: justify;
+}
+ul{
+    font-family: 'Arial', 'Times New Roman';
+    font-size: 15px;
+    color: darkslategrey;
+    font-style:normal;
+    font-variant:normal;
+    text-align: left;
 }
 a{
     color: maroon;
