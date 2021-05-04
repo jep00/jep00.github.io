@@ -1,195 +1,213 @@
 /* Portfolio website style sheet, Version 1 design */ 
-
-/*Fonts
-  Choose body font, currently Times and Arial;
-  Menlo for all code 
+  
+  /*Fonts
+Choose body font, currently Times and Arial;
+Menlo for all code 
 */
-
-
-@font-face {
-    font-family: "menlo";
-    src: url("Menlo-Regular.ttf");
-}
+  @font-face{
+    font-family: 'Roboto';
+    src: url('fonts/Roboto-Regular.ttf');
+    font-weight: normal;
+    font-style: normal;
+  }
+  
+  @font-face{
+    font-family: 'Menlo';
+    src: url('fonts/Menlo-Regular.ttf');
+    font-weight: normal;
+    font-style: normal;
+  }
+  
 /* Main */
-html {
+  html {
     scroll-behavior: smooth;
     scroll-padding: 175px;
-}
-body {
-    background-color: cornsilk;
+  }
+  body {
+    background-color: honeydew;
     margin: 0;
     padding: 0;
-}
+  }
+  hr {
+    border-color: darkslategrey;
+  }
 
-/* General Containers */ 
-.top {
-    margin-top: 0px;
-    width: 750px;
-    height: auto;
-    margin: auto;
-    padding-top: 0px;
-    overflow: hidden;
-    background-color: cornsilk;
-}
-.toptxt {
-    margin-left: 0;
-    position: fixed;
-    background-color: cornsilk;
-    width: 750px;
-    padding-top: 10px;
-}
+/* Containers */ 
 
-.container {
-    margin-top: 30px;
-    max-width: 600px;
-    height: auto;
-    margin: auto;
-    padding-top: 175px;
-    overflow: scroll;
+.container { /* Body */
+  margin-top: 5px;
+  max-width: 600px;
+  height: auto;
+  margin: auto;
+  padding-top: 60px;
+  overflow: scroll;
 }
 .projectcontainer {
-    max-width: 575px;
-    height: auto;
-    margin-left: 25px;
+  max-width: 575px;
+  height: auto;
+  margin-left: 25px;
 }
 .paracontainer {
-    max-width: 500px;
-    height: auto;
-    margin-left: 25px;
+  max-width: 500px;
+  height: auto;
+  margin-left: 25px;
 }
 .footer{
-  background: blanchedalmond;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  background: lightcyan;
   text-align: center;
 }
 
 /* Typefaces */
-h1{
-    color: maroon;
+  h1{
+    color: crimson;
     text-align: left;
-    font-family: 'menlo', Arial, serif;
+    font-family: 'Roboto', 'menlo', Arial, serif;
     font-size: 50px;
     font-style: normal;
     font-weight: 900;
     line-height: 50px;
-}
+  }
 h2{
-    color: maroon;
-    font-family: 'Arial', monospace;
-    font-size: 20px;
-    font-style: normal;
-    font-variant: normal;
-    font-weight: 400;
-    line-height: 21px;
-    text-align: center;
+  color: navy;
+  font-family: 'Roboto', Arial, serif;
+  font-size: 20px;
+  font-style: normal;
+  font-variant: normal;
+  font-weight: 400;
+  line-height: 21px;
+  text-align: center;
 }
 h3{
-    color: maroon;
-    font-family: 'menlo', monospace;
-    font-size: 15px;
-    font-style: normal;
-    font-variant: normal;
-    font-weight: 400;
-    line-height: 14px;
-    text-align: justify;
+  color: navy;
+  font-family: 'menlo', monospace;
+  font-size: 15px;
+  font-style: normal;
+  font-variant: normal;
+  font-weight: 400;
+  line-height: 14px;
+  text-align: justify;
 }
 h4{
-    color: maroon;
-    font-family: 'Arial', monospace;
-    font-size: 15px;
-    font-style: normal;
-    font-variant: normal;
-    font-weight: 400;
-    line-height: 14px;
-    text-align: center;
+  color: navy;
+  font-family: 'Roboto', 'Arial', serif;
+  font-size: 15px;
+  font-style: normal;
+  font-variant: normal;
+  font-weight: 400;
+  line-height: 14px;
+  text-align: left;
 }
 .bubble{
-    color: cornsilk;
-    background-color: maroon;
-    padding: 1px 5px;
-    margin-right: 2px;
-    display: inline;
-    text-decoration: none;
-    text-align: justify;
+  color: mintcream;  
+  background-color: navy;
+  padding: 1px 5px;
+  margin-right: 2px;
+  display: inline;
+  text-decoration: none;
+  text-align: justify;
 }
 .lang{
+  font-family: 'menlo';
   color: gold;
-  font-size: 13px;
-  background-color: cadetblue;
+  font-size: 10px;
+  background-color: navy;
   padding: 1px 3px;
   margin-right:2px;
 }
 p{
-    font-family: 'Arial', 'Menlo', 'Times New Roman', monospace;
-    font-size: 15px;
-    color:darkslategrey;
-    font-style: normal;
-    font-variant: normal;
-    font-weight: 300;
-    line-height: 17px;
-    text-align: justify;
+  font-family: 'Roboto', 'Arial', serif;
+  font-size: 15px;
+  color:darkslategrey;
+  font-style: normal;
+  font-variant: normal;
+  font-weight: 300;
+  line-height: 17px;
+  text-align: justify;
 }
 ul{
-    font-family: 'Arial', 'Times New Roman';
-    font-size: 15px;
-    color: darkslategrey;
-    font-style:normal;
-    font-variant:normal;
-    text-align: left;
+  font-family: 'Roboto', 'Arial', 'Times New Roman';
+  font-size: 15px;
+  color: darkslategrey;
+  font-style:normal;
+  font-variant:normal;
+  text-align: left;
 }
 a{
-    color: maroon;
-    text-decoration: none;
+  color: crimson;
+  text-decoration: none;
 }
 a:hover{
-    color: cornsilk;
-    background-color: maroon;
+  color: maroon;
 }
 
+.navbar{
+  background-color: darkslategrey;
+  color: honeydew;
+
+}
 /* Hideable Areas 
 see https://www.w3schools.com/howto/howto_js_collapsible.asp
 */
-
-/* Button */
-.colbut {
-  background-color: blanchedalmond;
-  color: maroon;
-  width: 100%;
-  border: none;
-  text-align: left;
-  outline: none;
-  font-family: 'Menlo', 'Arial';
-  font-size: 15px;
-  padding-left: 5px;
-}
+  
+  /* Button */
+  .colbut {
+    background-color: honeydew;
+    color: navy;
+    width: 100%;
+    border: none;
+    text-align: left;
+    outline: none;
+    font-family: 'Roboto', 'Arial';
+    font-size: 15px;
+    padding-left: 5px;
+  }
 
 /* Add a background color to the button if it is clicked on (add the .active class with JS), and when you move the mouse over it (hover) */
-.active, .collapsible:hover {
-  background-color: maroon;
-  color: cornsilk;
-}
+  .active, .collapsible:hover {
+    background-color: navy;
+    color: honeydew;
+  }
 
 /* Style the collapsible content. Note: hidden by default */
-.content {
-  padding-top: 0 20px;
-  padding-left: 15px;
-  padding-right: 15px;
-  overflow: hidden;
-  background-color: blanchedalmond;
-  max-height: 0;
-  transition: max-height 0.2s ease-out;
-} 
+  .content {
+    padding-top: 0 20px;
+    padding-left: 15px;
+    padding-right: 15px;
+    overflow: hidden;
+    background-color: azure;
+    max-height: 0;
+    transition: max-height 0.2s ease-out;
+  } 
 
 .column {
   float: left;
   width: 50%;
 }
 
-/* Clear floats after the columns */
-.row:after {
-  content: "";
-  display: table;
-  clear: both;
+
+.colbut:after {
+  content: "+"; /* Unicode character for "plus" sign (+) */
+  font-size: 13px;
+  color: navy;
+  background-color:honeydew;
+  float: right;
 }
+
+.active:after {
+  content: "—" ;/* Unicode character for "minus" sign (-) */
+  background-color: navy;
+  color: honeydew;
+  float:right;
+}
+
+/* Clear floats after the columns */
+  .row:after {
+    content: "";
+    display: table;
+    clear: both;
+  }
 
 @media screen and (max-width: 300px) {
   .column {
