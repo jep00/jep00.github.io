@@ -87,7 +87,7 @@ h3{
   font-style: normal;
   font-variant: normal;
   font-weight: 400;
-  line-height: 0px;
+  line-height: 0;
   text-align: justify;
 }
 h4{
@@ -166,7 +166,7 @@ see https://www.w3schools.com/howto/howto_js_collapsible.asp
   }
 
 /* Add a background color to the button if it is clicked on (add the .active class with JS), and when you move the mouse over it (hover) */
-  .active, .collapsible:hover {
+  .active2, .collapsible:hover {
     background-color: navy;
     color: honeydew;
   }
@@ -196,7 +196,7 @@ see https://www.w3schools.com/howto/howto_js_collapsible.asp
   float: right;
 }
 
-.active:after {
+.active2:after {
   content: "—" ;/* Unicode character for "minus" sign (-) */
   background-color: navy;
   color: honeydew;
@@ -214,4 +214,54 @@ see https://www.w3schools.com/howto/howto_js_collapsible.asp
   .column {
     width: 100%;
   }
+}
+
+
+
+/*https://www.w3schools.com/howto/howto_js_filter_elements.asp*/
+
+.container2 {
+  overflow: hidden;
+}
+
+.filterDiv {
+  display: none; /* Hidden by default */
+  background-color: honeydew;
+  color: navy;
+  width: 100%;
+  border: none;
+  text-align: left;
+  outline: none;
+  font-family: 'Roboto', 'Arial';
+  font-size: 17.5px;
+  padding-left: 5px;
+  padding-top: 10px;
+}
+
+
+/* The "show" class is added to the filtered elements */
+.show {
+  display: block;
+}
+
+/* Style the buttons */
+.btn {
+  font-family: 'Roboto', 'Arial';
+  border: none;
+  outline: none;
+  padding: 7px 7px;
+  background-color: navy;
+  color:honeydew;
+}
+
+
+/* Add a light grey background on mouse-over */
+.btn:hover {
+  background-color: crimson;
+}
+
+/* Add a dark background to the active button */
+.btn.active {
+  background-color: crimson;
+  color: gold;
 }

@@ -11,7 +11,7 @@
       <p>
       <a href = "index.html" style = "color:navy">Home</a> | 
       <span style = "color:crimson"><b>CV</b></span> | 
-      <a href = "wait.html" style = "color:navy">Projects</a>
+      <a href = "projects.html" style = "color:navy">Projects</a>
       
       <hr>
       <p style = "text-align:center; font-size: 15px"><a href = '/docs/cv.pdf' style = "color: darkslategrey"><em>View as a PDF.</em></a></p>
@@ -100,8 +100,8 @@
         
         for (i = 0; i < coll.length; i++) {
           coll[i].addEventListener("click", function() {
-            this.classList.toggle("active");
-            var content = this.nextElementSibling;
+            this.classList.toggle("active2");
+             var content = this.nextElementSibling;
             if (content.style.maxHeight){
               content.style.maxHeight = null;
             } else {

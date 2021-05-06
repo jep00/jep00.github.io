@@ -1,62 +1,112 @@
 <!DOCTYPE HTML>
-<html lang = en>
-  <head><title>Joe Pym/ Projects</title>
-  <meta charset = 'utf-8'>
-  <link rel="stylesheet" href="style.css">
-  </head>
-  
-  <body>
-    <div class = 'top'>
-      <div class = 'toptxt'>
-        <h1>Joe Pym <span class="bubble">Projects</span></h1>
-        <h3 style='text-align:left'>home projects contact cv</h3>
-      </div>
-    </div>
-    
-    <div class='container'>
-      <!-- Add ul environment to stylesheet; fill out ongoing and finished projects -->
-      <h2>Ongoing</h2>
-      <button type = 'button' class='colbut'>&raquo; Assessing the accuracy of betting odds in European football <span class='lang'>R</span><span class='lang'>LaTeX</span></button>
-        <div class = 'content'>
-          <p><em>Final year university project.</em> Assessing the accuracy of betting odds over 3 betting markets, and 75,000 matches across European football leagues. Techniques involve initial and exploratory data analysis, correlation analysis, principal components analysis, and running a simulation of a method of gambling. Used new research skills and reviewing literature.</p>
-        </div>
-      <br>
-      <button type = 'button' class='colbut'>&raquo; Portfolio Website <span class='lang'>HTML</span><span class='lang'>CSS</span></button>
-        <div class = 'content'>
-          <p>This website! I'm currently learning basic HTML and CSS (and small amounts of JavaScript) to create this website.<br>&raquo; <a href = ''><b><em>GitHub Repository</em></b></a> </p>
-        </div>
-      <br>
-      <h2>Past Works</h2>
-      
-      <br>
-      <h2>University Modules & Courseworks</h2>
-      <button type = 'button' class='colbut'>&raquo; Coursework Writeups <span class='lang'>LaTeX</span></button>
-        <div class = 'content'>
-          <p>In the repository is a range of LaTeX write ups from my three years at university, including on modules such as Further Algebra & Calculus, Mathematical & Numerical Analysis, and Operational Research Techniques.<br> &raquo; Ongoing <a href = ''><b><em>GitHub Repository</em></b></a></p>
-        </div>
-      <br>
-      <button type = 'button' class='colbut'>&raquo; Optimisation <span class='lang'>Python</span></button>
-        <div class = 'content'>
-          <p><em>Third year university module.</em> Various Python programs to apply optimisation techniques, such as Simulated Annealing, the Simplex Method, Newton's Method, the Gradient Descent Method, etc. using packages such as Matplotlib's pyplot, numpy, and scipy. <br> &raquo; Ongoing <a href = ''><b><em>GitHub Repository</em></b></a></p>
-        </div>
-      <br>
-      <button type = 'button' class='colbut'>&raquo; Coding & Cryptography <span class='lang'>MATLAB</span><span class='lang'>Python</span><span class='lang'>LaTeX</span></button>
-        <div class = 'content'>
-          <p><em>Third year university module.</em> Part of the assessment was two courseworks: <b>Coding</b>, involving Huffman codes, ISBN numbers, and Kraft's Inequality with limited use of MATLAB; and <b>Cryptography</b>, with questions on the RSA, ElGamal and Knapsack cryposystems, using MATLAB and Python to solve problems. <br>&raquo; Grade: <b>94% and 96%</b> <a href = ''><b><em>GitHub Repository</em></b></a></p>
-        </div>
-      <br>
-      <button type = 'button' class='colbut'>&raquo; MATLAB Simulation & Symbolic Algebra Coursework <span class='lang'>MATLAB</span><span class='lang'>LaTeX</span></button>
-        <div class = 'content'>
-          <p><em>First year university project.</em> First coursework involving LaTeX and programming. Task 1 involved a simulation where a randomly generated number of balls appeared within a given radius, which then moved randomly, interacting with 'walls', other balls, etc. Task 2 involved using symbolic algebra in MATLAB to integrate, differentiate, and plot a cubic function with labels. <br>&raquo; Grade: <b>90%</b> <a href = ''><b><em>GitHub Repository</em></b></a></p>
-        </div>
+  <html lang = en>
+    <head><title>Joseph Pym—Projects</title>
+    <meta charset = 'utf-8'>
+      <link rel="stylesheet" href="style.css">
+        </head>
         
+        <body>
+        <div class='container'>
+          <h1>Joseph Pym</h1>
+          <p>
+          <a href = "index.html" style = "color:navy">Home</a> | 
+          <a href = "cv.html" style = "color:navy">CV</a> | 
+              <span style = "color:crimson"><b>Projects</b></span>
+              
+              <hr>
+          <p><em>University work will be published once all results are finalised.</em><br>Filter:</p>
+          
+          <div>
+            <button class="btn" onclick="filterSelection('all')"> View All</button>
+            <button class="btn" onclick="filterSelection('rprog')"> R</button>
+            <button class="btn" onclick="filterSelection('latex')"> LaTeX</button>
+            <button class="btn" onclick="filterSelection('python')"> Python</button>
+            <button class="btn" onclick="filterSelection('matlab')"> MATLAB</button>
+            <button class="btn" onclick="filterSelection('html')"> HTML/CSS</button>
+          </div>
+          
+          <div class='container2'>
+            <div class="filterDiv rprog latex">
+               <button type = 'button' class='colbut'>
+                 Assessing the accuracy of betting odds in European football
+                 <span class='lang'>R</span><span class='lang'>LaTeX</span></button>
+              <div class = 'content'>
+                <p><em>Final year university project.</em> 
+                <br>Using R to conduct multiple analyses to assess the accuracy of football betting odds, as well as critical evaluation of existing literature and the creation of an algorithm to place bets.<br>
+                <b>Grade: Unmarked</b><br><a href=""><b>&raquo; Github Repository</b></a></p>
+              </div>
+            </div>
+            
+            <div class="filterDiv html">
+               <button type = 'button' class='colbut'>
+                 My Website
+                 <span class='lang'>HTML/CSS</span></button>
+              <div class = 'content'>
+                <p>This website, as a way to learn basic HTML and CSS.<br>
+                <a href="https://github.com/jep00/jep00.github.io"><b>&raquo; Github Repository</b></a></p>
+              </div>
+            </div>
+            
+            <div class="filterDiv latex">
+               <button type = 'button' class='colbut'>
+                 Coursework Writeups
+                 <span class='lang'>LaTeX</span></button>
+              <div class = 'content'>
+                <p>In the Github repository is a range of writeups (compiled on LaTeX) from university, on modules such as Further Algebra &amp; Calculus, Mathematical &amp; Numerical Analysis, and Operational Research Techniques.<br>
+                <a href=""><b>&raquo; Github Repository</b></a></p>
+              </div>
+            </div>
+            
+            <div class="filterDiv python">
+               <button type = 'button' class='colbut'>
+                 Optimisation
+                 <span class='lang'>Python</span></button>
+              <div class = 'content'>
+                <p><em>Third year university module</em><br>
+                Various Python programs to apply optimisation techniques, such as Simulated Annealing, the Simplex Method, Newton's Method, the Gradient Descent Method, etc. using packages such as Matplotlib's pyplot, numpy, and scipy.<br>
+                <b>Grade: </b><br>
+                <a href=""><b>&raquo; Github Repository</b></a></p>
+              </div>
+            </div>
+
+            <div class="filterDiv matlab python latex">
+               <button type = 'button' class='colbut'>
+                 Coding &amp; Cryptography
+                 <span class='lang'>MATLAB</span><span class='lang'>Python</span><span class='lang'>LaTeX</span></button>
+              <div class = 'content'>
+                <p><em>Third year university module</em><br>
+                Two courseworks: <b>Coding</b> involving Huffman codes, ISBN numbers, and Kraft's Inequality, with limited use of MATLAB; and <b>Cryptography</b> involving the RSA, ElGamal, and Knapsack crytosystems, using MATLAB and Python to solve problems.<br>
+                <b>Grade: 94% and 95%</b><br>
+                <a href=""><b>&raquo; Github Repository</b></a></p>
+              </div>
+            </div>
+
+            <div class="filterDiv matlab latex">
+               <button type = 'button' class='colbut'>
+                 MATLAB Simulation and Symbolic Algebra Coursework
+                 <span class='lang'>MATLAB</span><span class='lang'>LaTeX</span></button>
+              <div class = 'content'>
+                <p><em>First year university coursework</em><br>
+                First coursework involving LaTeX and programming. Task 1 involved a simulation where a randomly generated number of balls appeared within a given radius, which then moved randomly, interacting with 'walls', other balls, etc. Task 2 involved using symbolic algebra in MATLAB to integrate, differentiate, and plot a cubic function with labels<br>
+                <b>Grade: 90%</b><br>
+                <a href=""><b>&raquo; Github Repository</b></a></p>
+              </div>
+            </div>
+            
+         </div>
+         
+         
+         
+         
+              
+              
       <script>
         var coll = document.getElementsByClassName("colbut");
         var i;
         
         for (i = 0; i < coll.length; i++) {
           coll[i].addEventListener("click", function() {
-            this.classList.toggle("active");
+            this.classList.toggle("active2");
              var content = this.nextElementSibling;
             if (content.style.maxHeight){
               content.style.maxHeight = null;
@@ -66,17 +116,56 @@
           });
         }
         </script>
-      <div class ='footer'>
-        <p style="text-align: center"><em>You've reached the end of this page.</em>
-        <br>@ | 
-        <a href = 'http://www.twitter.com/_jep00'>twitter</a> |
-        <a href = 'http://www.linkedin.com/in/josephpym'>linkedin</a> |
-        <a href = 'http://www.github.com/jep00'>github</a> |
-        <a href = 'http://www.kaggle.com/joepym'>kaggle</a> |
-        <a href = 'http://www.medium.com/@josephpym'>medium</a> |
-        <a href = 'mailto:josephpym@outlook.com'>email</a>
-        </p>
-      </div>
+        <script>
+        filterSelection("all")
+        function filterSelection(c) {
+          var x, i;
+          x = document.getElementsByClassName("filterDiv");
+          if (c == "all") c = "";
+          // Add the "show" class (display:block) to the filtered elements, and remove the "show" class from the elements that are not selected
+          for (i = 0; i < x.length; i++) {
+            w3RemoveClass(x[i], "show");
+            if (x[i].className.indexOf(c) > -1) w3AddClass(x[i], "show");
+          }
+        }
+        
+        // Show filtered elements
+        function w3AddClass(element, name) {
+          var i, arr1, arr2;
+          arr1 = element.className.split(" ");
+          arr2 = name.split(" ");
+          for (i = 0; i < arr2.length; i++) {
+            if (arr1.indexOf(arr2[i]) == -1) {
+              element.className += " " + arr2[i];
+            }
+          }
+        }
+        
+        // Hide elements that are not selected
+        function w3RemoveClass(element, name) {
+          var i, arr1, arr2;
+          arr1 = element.className.split(" ");
+          arr2 = name.split(" ");
+          for (i = 0; i < arr2.length; i++) {
+            while (arr1.indexOf(arr2[i]) > -1) {
+              arr1.splice(arr1.indexOf(arr2[i]), 1);
+            }
+          }
+          element.className = arr1.join(" ");
+        }
+        
+        // Add active class to the current control button (highlight it)
+        var btnContainer = document.getElementById("myBtnContainer");
+        var btns = btnContainer.getElementsByClassName("btn");
+        for (var i = 0; i < btns.length; i++) {
+          btns[i].addEventListener("click", function() {
+            var current = document.getElementsByClassName("active");
+            current[0].className = current[0].className.replace(" active", " ");
+            this.className += " active";
+          });
+        }
+        </script>
+      
     
     </div>
   </body>
