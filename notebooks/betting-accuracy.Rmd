@@ -1,0 +1,1693 @@
+---
+title: "Assessing the Accuracy of Betting Odds in European Football"
+author: "Joseph Pym"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+---
+
+<a href="http://jep00.github.io">jep00.github.io</a>
+
+# Welcome!
+
+This project---my final year BSc project---aims to quantify bookmaker accuracy in European football, across two groups of football leagues: an elite group and the English & Scottish pyramids. The full write-up (in .pdf form) is available [here](http://jep00.github.io/docs/work/bettingaccuracy.pdf), and the GitHub repository [here](https://github.com/jep00/betting-accuracy/). In this page, I will go over the main findings and techniques used: please see the other two documents for the full work! In addition, this won't analyse the findings in-depth, that's available in the [dissertation](http://jep00.github.io/docs/work/bettingaccuracy.pdf).
+
+# 1 Introduction
+
+This project utilised R, and is split over three documents:
+
+-   the first conducts analysis on the elite group (the top tiers in Germany, England, Spain, France, Italy, and Portugal) in the 1X2 (betting on the explicit result of a match) market only and is paired with an investigation into the impact of competitive balance;
+
+-   the second conducts analysis on the English & Scottish group in three markets: the 1X2, Under/Over 2.5 Goals and Asian Handicap (these are explained in the .pdf file) and is paired with an investigation into the overround (commission);
+
+-   the third and final creates and assesses an algorithm designed based on the findings, and is compared against a random bet strategy, where bets are placed at random with the same distribution as our algorithm.
+
+The data was analysed from the 2005/06 season until the 2019/20 season, due to our data source having enough information in these seasons, but not in earlier ones. The elite group was chosen due to their [UEFA country coefficients](https://www.uefa.com/memberassociations/uefarankings/country/#/yr/2021), and the English & Scottish leagues due to our source having at least 3 seasons worth of data (5 and 4 respectively: no other league pyramid has more than 2).
+
+# 2 Elite Leagues
+
+```{r setup_env, message=FALSE, warning=FALSE}
+#Set up environment and load libraries
+#setwd("~/Desktop/University/University Year 3/331MP/Data")
+library(MASS); library(ggplot2); library(gridExtra); library(carData)
+```
+
+## 2.1 Initial Data Analysis
+
+The first step conducted was *initial data analysis* (IDA) where a smaller dataset was briefly investigated in order to ensure the data source ([football-data.co.uk](http://www.football-data.co.uk)) was used for the project) works as expected. This was done by analysing (using very simple methods) one leagues data across a single season. Chosen at random, the French Ligue Une 2016/17 season was chosen. We found this all worked as expected
+
+## 2.2 Exploratory Data Analysis
+
+Exploratory data analysis is the first step we conduct on the entire dataset, which we must first read in, and find the consensus probabilities: we find this by taking the inverse of the odds, and normalising. As we are considering six leagues and 15 seasons, we have ninety datasets to consider: for efficiency, we use a for loop for this. Additionally, for later analysis, we require the 'correct' and 'incorrect' probabilities, and the natural log of the correct probabilities.
+
+```{r enterdata, message=FALSE, warning=FALSE}
+#Define which countries and seasons we need to read:
+countries <- c("de", "en", "es", "fr", "it", "po")
+co.we <- c("D1", "E0", "SP1", "F1", "I1", "P1") 
+#n.b. The Premier League's code is 0; other countries are 1.
+seasons <- c("0506", "0607", "0708", "0809", "0910", "1011", "1112", "1213", "1314", "1415", "1516", "1617", "1718", "1819", "1920")
+eliteTemp <- NULL; elite <- NULL
+for (i in seasons){
+  for (j in 1:6){
+    eliteTemp <- read.csv(paste0('https://www.football-data.co.uk/mmz4281/', i, '/', co.we[j],'.csv'), fileEncoding = 'latin1')
+    eliteTemp$Country <- with(eliteTemp, countries[j])
+    eliteTemp$Season <- with(eliteTemp, i)
+    if (i=="1920"){
+      eliteTemp$BbAvH<-eliteTemp$AvgH; eliteTemp$BbAvA<-eliteTemp$AvgA
+      eliteTemp$BbAvD<-eliteTemp$AvgD
+    }
+    else{}
+    eliteTemp <- eliteTemp[ ,c("Div", "Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR", "BbAvH", "BbAvD", "BbAvA", "Country", "Season")]
+    elite <- rbind(elite, eliteTemp)
+  }
+}
+elite <- na.omit(elite)
+
+#Finding underlying probabilities: 
+#Pre-Normalised Probabilities
+elite$AvgHProbPN <- with(elite, round(1/BbAvH, 4)) 
+elite$AvgDProbPN <- with(elite, round(1/BbAvD, 4))
+elite$AvgAProbPN <- with(elite, round(1/BbAvA, 4))
+#To normalise them:
+elite$overround<-with(elite, (AvgHProbPN + AvgDProbPN + AvgAProbPN))
+elite$AvgHProb <-with(elite, round(AvgHProbPN/overround, 4))
+elite$AvgDProb <-with(elite, round(AvgDProbPN/overround, 4))
+elite$AvgAProb <-with(elite, round(AvgAProbPN/overround, 4))
+
+#For later analysis, we need the Correct/Incorrect Probabilities:
+N<-nrow(elite)
+elite$Correct<-with(elite, rep(0, N))
+elite$Incorr1<-with(elite, rep(0, N))
+elite$Incorr2<-with(elite, rep(0, N))
+
+for (i in 1:N){
+  if ((elite$FTR[i])=="A"){
+    elite$Correct[i]<-(elite$Correct[i] + elite$AvgAProb[i])
+    elite$Incorr1[i]<-(elite$Incorr1[i] + elite$AvgDProb[i])
+    elite$Incorr2[i]<-(elite$Incorr2[i] + elite$AvgHProb[i])}
+  else if ((elite$FTR[i])=="H"){
+    elite$Correct[i]<-(elite$Correct[i] + elite$AvgHProb[i])
+    elite$Incorr1[i]<-(elite$Incorr1[i] + elite$AvgDProb[i])
+    elite$Incorr2[i]<-(elite$Incorr2[i] + elite$AvgAProb[i])}
+  else {
+    elite$Correct[i]<-(elite$Correct[i] + elite$AvgDProb[i])
+    elite$Incorr1[i]<-(elite$Incorr1[i] + elite$AvgAProb[i])
+    elite$Incorr2[i]<-(elite$Incorr2[i] + elite$AvgHProb[i])} 
+}
+elite$logCorrect<-with(elite, rep(0,N))
+for (j in 1:N){elite$logCorrect[j]<-log(elite$Correct[j], base=exp(1))}
+```
+
+Now we've loaded the data, and cleaned up the dataframes, we can begin our analysis. First, we consider basic calculations and plots, using density plots, and splitting them by-league. In addition, we look at boxplots, and a tile-plot of the mean correct probability for each result.
+
+```{r edaplots, message=FALSE, warning=FALSE}
+basic.elite <- matrix(c(mean(elite$AvgHProb), mean(elite$AvgDProb), mean(elite$AvgAProb), 
+                        sd(elite$AvgHProb), sd(elite$AvgDProb), sd(elite$AvgAProb)), 
+                      ncol=3, nrow=2, byrow=T)
+rownames(basic.elite) <- c('mean', 'sd'); colnames(basic.elite) <- c('h', 'd', 'a')
+basic.elite; round(prop.table(table(elite$FTR)), 4) #Observed probabilities
+
+## Boxplots
+bp.home <- ggplot(elite, aes(x=FTR, y=AvgHProb)) + 
+  geom_boxplot(outlier.size=0.75, outlier.alpha=0.7, color="blue") + 
+  theme_light() + stat_boxplot(coef=5) + 
+  labs(x="Actual Result", y="Consensus Probability", title = "Home Win", caption = "") + 
+  coord_cartesian(ylim=c(0,1))
+
+bp.draw <- ggplot(elite, aes(x=FTR, y=AvgDProb)) + 
+  geom_boxplot(outlier.size=0.75, outlier.alpha=0.7, color="green4") +
+  theme_light() + stat_boxplot(coef=5) + 
+  labs(x="Actual Result", y="Consensus Probability", title = "Draw", caption = "") + 
+  coord_cartesian(ylim=c(0,1))
+
+bp.away <- ggplot(elite, aes(x=FTR, y=AvgAProb)) + 
+  geom_boxplot(outlier.size=0.75, outlier.alpha=0.7, color="coral") + 
+  theme_light() + stat_boxplot(coef=5) + 
+  labs(x="Actual Result", y="Consensus Probability", title = "Away Win", caption="Elite European Leagues, 2005-2020") + 
+  coord_cartesian(ylim=c(0,1))
+
+eda.bp.all <- grid.arrange(bp.home, bp.draw, bp.away, nrow=1, ncol=3)
+
+##Density Plots
+eda.wins.dens.all <- ggplot(elite, aes(x=AvgHProb, color="HW")) + 
+  geom_density() + geom_density(data=elite, mapping=aes(x=AvgAProb, color="AW"), show.legend=T) + 
+  coord_cartesian(xlim=c(0,1)) + 
+  labs(title="Home and Away Wins", caption="Elite Leagues, 2005-2020", x="Consensus Probability", y="Density") + 
+  theme_light() + scale_color_manual(name="Market", values=c("HW" = "blue", "AW" = "coral"))
+
+eda.draw.dens.all <- ggplot(elite, aes(x=AvgDProb, color="D")) + 
+  geom_density() + coord_cartesian(xlim=c(0,1)) + 
+  labs(title="Draws", caption="", x="Consensus Probability",y="Density") + 
+  theme_light() + scale_color_manual(name = "Market", values=c("D" = "green4"))
+
+eda.density.all <- grid.arrange(eda.wins.dens.all, eda.draw.dens.all, nrow=1, ncol=2, left="", bottom="")
+
+#Splitting these by league:
+#Home Wins
+eda.home.dens <- ggplot(elite, aes(x=AvgHProb, color=Country)) + 
+  geom_density() + coord_cartesian(xlim=c(0,1)) + 
+  labs(title="Home Win", x=NULL, y=NULL) + theme_light() + 
+  geom_vline(aes(xintercept=mean(AvgHProb)), linetype="dashed", size=0.3)+
+  guides(y="none") + theme(legend.position="none")
+#Away Wins
+eda.away.dens <- ggplot(elite, aes(x=AvgAProb, color=Country)) + 
+  geom_density() + coord_cartesian(xlim=c(0,1)) +
+  labs(title="Away Win", caption = "Elite European Leagues, 2005-20", x=NULL, y=NULL) + 
+  theme_light() + geom_vline(aes(xintercept=mean(AvgAProb)), linetype="dashed", size=0.3) +
+  guides(y="none") + theme(legend.position="none")
+#Draws
+eda.draw.dens <- ggplot(elite, aes(x=AvgDProb, color=Country)) + 
+  geom_density() + coord_cartesian(xlim=c(0,0.8)) + 
+  labs(title="Draw", x=NULL, y=NULL) + 
+  geom_vline(aes(xintercept=mean(AvgDProb)), linetype="dashed", size=0.3) + 
+  guides(y="none") + theme_light() + 
+  scale_colour_discrete(labels = c("Germany", "England", "Spain", "France", "Italy", "Portugal"))
+
+eda.density <- grid.arrange(eda.home.dens, eda.draw.dens, eda.away.dens, nrow=3, ncol=1, left="", bottom="Consensus Probability")
+
+##Tile Plot
+#We will group 5+ goals together
+elite$FTHG.Tile <- with(elite,rep(0,N))
+elite$FTAG.Tile <- with(elite,rep(0,N))
+for (k in 1:N){
+  if ((elite$FTHG[k])>=5){elite$FTHG.Tile[k] <- 5}
+  else{elite$FTHG.Tile[k] <- elite$FTHG[k]}}
+for (k in 1:N){
+  if ((elite$FTAG[k])>=5){elite$FTAG.Tile[k] <- 5}
+  else{elite$FTAG.Tile[k] <- elite$FTAG[k]}}
+    
+elite.tile <- ggplot(elite, aes(y=FTAG.Tile, x=FTHG.Tile)) + 
+  geom_tile(aes(fill = Correct)) + 
+  scale_fill_distiller(palette = "Greens", direction = 1, name="Correct\nProbability") + 
+  theme_light() + 
+  labs(title="Match Result v. Correct Consensus Probability", x="Home Goals Scored", y="Away Goals Scored", caption="Elite European Leagues, 2005-2020") + 
+  scale_y_discrete(limits=factor(c(1:4, "5+"))) +
+  scale_x_discrete(limits=factor(c(1:4, "5+"))) +
+  geom_abline(intercept=0, slope=1) + coord_cartesian(xlim=c(0,5), ylim=c(0,5))
+
+elite.tile
+tpbinsizes.elite <- table(elite$FTAG.Tile, elite$FTHG.Tile); tpbinsizes.elite #How many games per tile
+```
+
+We now have a brief overview of the entire *elite* dataset. We can see that the variation for bookmakers consensus probabilities (and thus, odds offered) is very low for draws. The table displayed with unusually high Draw probabilities (greater than 0.6) shows all of these are in the Italian Serie A (further investigation shows 93% of the matches in the dataset with a probability of a Draw greater than 0.35 are Italian, and suggests possible match fixing: the number of games involved is so small we do not need to remove them from the analysis). Home Wins are symmetrically distributed about the mean, and Away Wins have a positive-skew, with a greater number of matches above the mode than below. In our by-league plot, we see two groups of leagues: three are trimodal, and three are unimodal. We investigate a possible reason---competitive balance---later.
+
+\#\#2.3 Correlation Analysis
+
+One method used to assess accuracy is to create a linear model to predict the observed probability of a match outcome based on the bookmaker consensus probability (ideal performance is linear: if bookmakers agree a match has a 50% chance of being a Home Win, high accuracy would be indicated if a group of such matches has an observed probability of 50% Home Wins). $R^2$ and $\textrm{RMSE}$ are two values that can be lifted from these models to further assess the accuracy, as well as looking at the *slope* (gradient) of the model created.
+
+```{r corranalysis, message=FALSE, warning=FALSE}
+#First, we cut the data into 'bins' choosing 124 breaks
+elite$AvgHProb.cut <- cut(elite$AvgHProb, 124, include.lowest=T)
+
+#Tapply finds the mean of the bin, rather than taking the midpoint - R's default
+levels(elite$AvgHProb.cut) <- tapply(elite$AvgHProb, elite$AvgHProb.cut, mean)
+
+#The c(1,2,3) will remove any extra (blank) rows
+elite.observed.probabilites.TabH <- prop.table(table(elite$FTR, elite$AvgHProb.cut), 2)[c(1, 2, 3),]
+
+#[n,]; if n = : 1 Away; 2 Draw; 3 Home (alphabetic)
+elite.observed.probabilites.H <- elite.observed.probabilites.TabH[3,] 
+elite.bookmaker.probabilites.H <- as.numeric(names(elite.observed.probabilites.H))
+
+#Repeating for each outcome:
+#Away Wins:-
+elite$AvgAProb.cut <- cut(elite$AvgAProb, 124, inclues.lowest=T)
+levels(elite$AvgAProb.cut) <- tapply(elite$AvgAProb, elite$AvgAProb.cut, mean)
+elite.observed.probabilites.TabA <- prop.table(table(elite$FTR, elite$AvgAProb.cut), 2)[c(1, 2, 3), ]
+elite.observed.probabilites.A <- elite.observed.probabilites.TabA[1, ]
+elite.bookmaker.probabilites.A <- as.numeric(names(elite.observed.probabilites.A))
+#Draws:-
+elite$AvgDProb.cut <- cut(elite$AvgDProb, 124, inclues.lowest=T)
+levels(elite$AvgDProb.cut) <- tapply(elite$AvgDProb, elite$AvgDProb.cut, mean)
+elite.observed.probabilites.TabD <- prop.table(table(elite$FTR, elite$AvgDProb.cut), 2)[c(1, 2, 3), ]
+elite.observed.probabilites.D <- elite.observed.probabilites.TabD[2, ]
+elite.bookmaker.probabilites.D <- as.numeric(names(elite.observed.probabilites.D))
+
+#Final Plot
+elite.scatter <- ggplot(data=NULL,aes()) + geom_smooth() +
+  geom_jitter(aes(x=elite.bookmaker.probabilites.H, y=elite.observed.probabilites.H, color = "Home Win"), size=0.75, show.legend=T) +
+  geom_smooth(aes(x=elite.bookmaker.probabilites.H, y=elite.observed.probabilites.H, color = "Home Win"), method=lm, alpha=.15, size=0.5) +
+  geom_jitter(aes(x=elite.bookmaker.probabilites.D, y=elite.observed.probabilites.D, color = "Draw"), size=0.75, show.legend=T) +
+  geom_smooth(aes(x=elite.bookmaker.probabilites.D, y=elite.observed.probabilites.D, color = "Draw"), method=lm, alpha=.15, size=0.5) +
+  geom_jitter(aes(x=elite.bookmaker.probabilites.A, y=elite.observed.probabilites.A, color = "Away Win"), size=0.75, show.legend = T) +
+  geom_smooth(aes(x=elite.bookmaker.probabilites.A, y=elite.observed.probabilites.A, color = "Away Win"), method=lm, alpha=.15, size=0.5) +
+  geom_abline(intercept = 0, slope = 1, linetype="dashed") + scale_color_manual(name="Bet Type", values=c("Home Win" = "blue", "Draw" = "green4", "Away Win" = "coral")) +
+  labs(title="Consensus vs. Observed Probabilities", x="Consensus Probability", y="Observed Probability", caption="Elite Euro. Leagues, 2005-2020\nBin Size: 250 Games") +
+  coord_cartesian(xlim=c(0, 1), ylim=c(0, 1)) + theme_light()
+
+elite.scatter
+```
+
+## 2.4 Predictive Performance
+
+Two statistics, $P_1$ and $P_2$, (see <a href="https://watermark.silverchair.com/dpq018.pdf?token=AQECAHi208BE49Ooan9kkhW_Ercy7Dm3ZL_9Cf3qfKAc485ysgAAArQwggKwBgkqhkiG9w0BBwagggKhMIICnQIBADCCApYGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMRrz7aHijMaOxc0duAgEQgIICZ7oT882lbpAzsOwwP04SQ7RgjTEf4GnJMWqeYb63WqIeux373SnFY9N9WDa3GhLEmr5BZnh54cFrBw5EWByOrNzPh3wiS4UAsHfIcGnn8iBctNYezt-Mm-iQAaAP4ZjCdNnJcwCyU2JDZbYas0Ag1XOGDmvYawhASpttkWtKwEW8mXHLU9rrIcBVaHEuknfc56sGLXx8xeDQ0TXD9uF3HzjG3IUgry2wtiW90sd4Z_hFUDXqWLeazQyOPXzqVfRlh9Nwy_lfD2ZjFxSjzrGIIB98rfZp3rlvS5qAerS7TKciorPDUb1DGVNTD5rzyA5rvyC87vdI5dBZEhmUSsy-7bNvAG-aJRlxDqMTvJD4qia47CYrs2JE1YWJPBe7SIYsX86Agv4OSOhkO0q-_hgg-SztyyiPgBF1GDKVi0Vl_ozk6vEM7l-dl3btatShIMjmbgY8JT2ESEtPOT1PKKpXdw4V0czZMpVhhYa7TfQBcAmnpbfIepPJquI515L93cpOMVU3SKMfXXe2d_Lzgne75xni0dKWQ4gXn0YVqgH3WYaVKiuTJ1kv_c3nctOSV2r6WgeR6qT2Q7DJnRTon6RzEKELNq5RMebjNooW2uMwC-bs25faIuk-ThuDBumO8UNzO-OvoQ85IyayhxKN-Xd1e47juwDOg5keMQqrZRPsMr0SLsUDaRiiW2N_XzNTWsDHaEDddeR52Hs4fEvBzME_ZlorYqBaWwxEl4nPD3q0tXJTnMsZx5hem-mFGYX09YQq9frQOjM_dEeVr7QSYEKmLce33aVxfIt4vfE8uNjbJ6Xo6cXKZtE8pA">this paper</a>) are also used. For a set of $N$ matches and considering match $k$, with a correct probability $\mathbb{P}(O_k)$ and two (for the 1X2 market) incorrect probabilities $\mathbb{P}(N_{1k})$ and $\mathbb{P}(N_{2k})$:
+
+$$
+P_1 = \exp\bigg\{\frac{1}{N}\sum^{N}_{k=1} \log_e\big[\mathbb{P}(O_k)\big]\bigg\}
+$$
+
+$$
+P_2 = \frac{1}{N} \sum^{N}_{k=1} \bigg\{ \big[1-\mathbb{P}(O_k)\big]^2 + \mathbb{P}(N_{1k})^2 + \mathbb{P}(N_{2k})^2 \bigg\}
+$$
+
+These are very useful comparative statistics, with higher $P_1$ and lower $P_2$ values indicating better performance. We found the $R^2$, RMSE, $P_1$, and $P_2$ for each league and season.
+
+## 2.5 Comparing Between Leagues
+
+```{r leaguecomp, message=FALSE, warning=FALSE}
+### MODELS FOR EACH LEAGUE ----
+RSqu.O <- NULL; RMSE.O <- NULL; p1.split <- NULL; p2.split <- NULL
+
+for(i in countries){
+  modelTempData <- elite[elite$Country==i, ]
+  #Bins
+  modelTempData$AvgHProb.cut <- cut(modelTempData$AvgHProb, 20, include.lowest=T)
+  modelTempData$AvgDProb.cut <- cut(modelTempData$AvgDProb, 5, include.lowest=T)
+  modelTempData$AvgAProb.cut <- cut(modelTempData$AvgAProb, 20, include.lowest=T)
+  
+  #Means of each bin
+  levels(modelTempData$AvgHProb.cut) <- tapply(modelTempData$AvgHProb, modelTempData$AvgHProb.cut, mean)
+  levels(modelTempData$AvgDProb.cut) <- tapply(modelTempData$AvgDProb, modelTempData$AvgDProb.cut, mean)
+  levels(modelTempData$AvgAProb.cut) <- tapply(modelTempData$AvgAProb, modelTempData$AvgAProb.cut, mean)
+  
+  #Observed Probability for each bin
+  modelTemp.obs.prob.tabH <- prop.table(table(modelTempData$FTR, modelTempData$AvgHProb.cut), 2)[c(1, 2, 3), ]
+  modelTemp.obs.prob.tabD <- prop.table(table(modelTempData$FTR, modelTempData$AvgDProb.cut), 2)[c(1, 2, 3), ]
+  modelTemp.obs.prob.tabA <- prop.table(table(modelTempData$FTR, modelTempData$AvgAProb.cut), 2)[c(1, 2, 3), ]
+  
+  modelTemp.obs.prob.H <- modelTemp.obs.prob.tabH[3, ]
+  modelTemp.obs.prob.D <- modelTemp.obs.prob.tabD[2, ]
+  modelTemp.obs.prob.A <- modelTemp.obs.prob.tabA[1, ]
+  
+  #Finds the bookmaker probabilities for each group and creates vectors
+  modelTemp.boo.prob.H <- as.numeric(names(modelTemp.obs.prob.H))
+  modelTemp.boo.prob.D <- as.numeric(names(modelTemp.obs.prob.D))  
+  modelTemp.boo.prob.A <- as.numeric(names(modelTemp.obs.prob.A))
+  modelTemp.bookmakers <- c(modelTemp.boo.prob.H, modelTemp.boo.prob.D, modelTemp.boo.prob.A)
+  modelTemp.observed   <- c(modelTemp.obs.prob.H, modelTemp.obs.prob.D, modelTemp.obs.prob.A)
+  
+  #Model creation
+  modelTempO <- lm(modelTemp.observed~modelTemp.bookmakers)
+  
+  #Finding values
+  RSqu.O <- c(RSqu.O, round(summary(modelTempO)$r.squared, 5))
+  RMSE.O <- c(RMSE.O, round(sqrt(mean(modelTempO$residuals^2)), 5))
+  
+  p1.temp <- exp((1/(nrow(modelTempData)))*sum(modelTempData$logCorrect))
+  p2.temp <- (1/(nrow(modelTempData))) * sum( (1-modelTempData$Correct)**2 + (modelTempData$Incorr1)**2 + (modelTempData$Incorr2)**2 )
+  
+  p1.split <- c(p1.split, round(p1.temp, 5))
+  p2.split <- c(p2.split, round(p2.temp, 5))
+}
+#Putting this into an easy-to-see Table:
+league.values <- matrix(c(RSqu.O, RMSE.O, p1.split, p2.split), ncol=6, byrow=T)
+rownames(league.values) <- c("RSqu.O", "RMSE.O", "p1.split", "p2.split")
+colnames(league.values) <- countries
+league.values <- as.table(league.values)
+league.values
+```
+
+We see that the German and French leagues have the worst performance, and the Portuguese and Italian the best.
+
+## 2.6 Competitive Balance
+
+*In the paper, we now look into the impact of competitive balance on bookmaker accuracy, using values from* <a href='https://core.ac.uk/download/pdf/7057475.pdf'>Goossens, 2005</a>. Personally, I think this is one of the most interesting parts of my discussion, and I would recommend reading it.
+
+## 2.7 Comparing between Seasons
+
+Next, doing it for each season. We will also assess the slope, to see if the models are approaching the ideal $y=x$ as time progresses. In addition, we add a plot of the variation for each statistic over time.
+
+```{r compseason, message=FALSE, warning=FALSE}
+rsqu.season <- NULL; rmse.season <- NULL; p1.season <- NULL; p2.season <- NULL; slope.season <- NULL
+for(i in seasons){
+  modelTempData <- elite[elite$Season==i, ]
+  modelTempData$AvgHProb.cut <- cut(modelTempData$AvgHProb, 10, include.lowest=T)
+  modelTempData$AvgDProb.cut <- cut(modelTempData$AvgDProb, 5, include.lowest=T)
+  modelTempData$AvgAProb.cut <- cut(modelTempData$AvgAProb, 10, include.lowest=T)
+  
+  #Finds the mean of each group (cut)
+  levels(modelTempData$AvgHProb.cut) <- tapply(modelTempData$AvgHProb, modelTempData$AvgHProb.cut, mean)
+  levels(modelTempData$AvgDProb.cut) <- tapply(modelTempData$AvgDProb, modelTempData$AvgDProb.cut, mean)
+  levels(modelTempData$AvgAProb.cut) <- tapply(modelTempData$AvgAProb, modelTempData$AvgAProb.cut, mean)
+  
+  #Finds the observed probability for each cut
+  modelTemp.obs.prob.tabH <- prop.table(table(modelTempData$FTR, modelTempData$AvgHProb.cut), 2)[c(1, 2, 3), ]
+  modelTemp.obs.prob.tabD <- prop.table(table(modelTempData$FTR, modelTempData$AvgDProb.cut), 2)[c(1, 2, 3), ]
+  modelTemp.obs.prob.tabA <- prop.table(table(modelTempData$FTR, modelTempData$AvgAProb.cut), 2)[c(1, 2, 3), ]
+  
+  modelTemp.obs.prob.H <- modelTemp.obs.prob.tabH[3, ]
+  modelTemp.obs.prob.D <- modelTemp.obs.prob.tabD[2, ]
+  modelTemp.obs.prob.A <- modelTemp.obs.prob.tabA[1, ]
+  
+  #Finds the bookmaker probabilities for each group and creates vectors
+  modelTemp.boo.prob.H <- as.numeric(names(modelTemp.obs.prob.H))
+  modelTemp.boo.prob.D <- as.numeric(names(modelTemp.obs.prob.D))  
+  modelTemp.boo.prob.A <- as.numeric(names(modelTemp.obs.prob.A))
+  modelTemp.bookmakers <- c(modelTemp.boo.prob.H, modelTemp.boo.prob.D, modelTemp.boo.prob.A)
+  modelTemp.observed   <- c(modelTemp.obs.prob.H, modelTemp.obs.prob.D, modelTemp.obs.prob.A)
+  
+  #Making the model
+  modelTempO <- lm(modelTemp.observed~modelTemp.bookmakers)
+  #Finding values
+  rsqu.season <- c(rsqu.season, round(summary(modelTempO)$r.squared, 5))
+  rmse.season <- c(rmse.season, round(sqrt(mean(modelTempO$residuals^2)), 5))
+  slope.season <- c(slope.season, round(modelTempO$coefficients[2], 5))
+  
+  p1.temp <- exp((1/(nrow(modelTempData)))*sum(modelTempData$logCorrect))
+  p2.temp <- (1/(nrow(modelTempData))) * sum( (1-modelTempData$Correct)**2 + (modelTempData$Incorr1)**2 + (modelTempData$Incorr2)**2 )
+  
+  p1.season <- c(p1.season, round(p1.temp, 5))
+  p2.season <- c(p2.season, round(p2.temp, 5))
+}
+
+season.values <- matrix(c(rsqu.season, rmse.season, p1.season, p2.season, slope.season), ncol=5, byrow=F)
+colnames(season.values) <- c("rsqu", "rmse", "p1", "p2", "slope")
+rownames(season.values) <- seasons
+
+#Plotting Season Values
+rsqu.se.plot <- ggplot(NULL, aes(y=rsqu.season, x=c(2005:2019))) + 
+  geom_jitter(color="violetred1")+theme_light() + labs(x = 'Year', y = 'R2') + 
+  geom_smooth(method = 'lm', color = 'violetred4', se = F)
+rmse.se.plot <- ggplot(NULL, aes(y=rmse.season, x=c(2005:2019))) + 
+  geom_jitter(color="steelblue4")+theme_light() + labs(x = 'Year', y = 'RMSE') + 
+  geom_smooth(method = 'lm', color = 'steelblue1', se = F)
+p1.se.plot <- ggplot(NULL, aes(y=p1.season, x=c(2005:2019))) + 
+  geom_jitter(color="darkorange4")+theme_light() + labs(x = 'Year', y = 'P1') + 
+  geom_smooth(method = 'lm', color = 'darkorange1', se = F)
+p2.se.plot <- ggplot(NULL, aes(y=p2.season, x=c(2005:2019))) + 
+  geom_jitter(color="slateblue4")+theme_light() + labs(x = 'Year', y = 'P2') + 
+  geom_smooth(method = 'lm', color = 'slateblue1', se = F)
+slope.se.plot <- ggplot(NULL, aes(y=slope.season, x=c(2005:2019))) + 
+  geom_jitter(color="springgreen3") + theme_light() + labs(x = "Year", y = "Slope") +
+  geom_smooth(method = "lm", color = "springgreen3", se = F) + 
+  geom_abline(slope = 0, intercept = 1, color = "black") + coord_cartesian(ylim = c(0.5, 1.5))
+
+seasontimeplot <- grid.arrange(rsqu.se.plot, rmse.se.plot, p1.se.plot, p2.se.plot, slope.se.plot, ggplot(NULL)+geom_blank()+theme_void(), nrow = 3, top = 'Elite Leagues Accuracy Statistics over Time')
+```
+
+Across all five measures, bookmaker accuracy is improving over time.
+
+## 2.8 Principal Components Analysis
+
+In this section, a pair of principal components analyses (PCA) are conducted: firstly, by-league; secondly, by-season. Full interpretation and explanation into the variables is given in the paper.
+
+```{r pca, message=FALSE, warning=FALSE}
+#We first define the competitive balance statistics (Gini, NAMSI and K) from Goossens (05). We only have these for the by-league analysis.
+namsi <- c(0.374, 0.372, 0.364, 0.342, 0.418, 0.505)
+kappa <- c(5.71, 5.79, 5.07, 6.00, 5.36, 4.07); invkap <- 1/kappa
+gini  <- c(0.723, 0.826, 0.861, 0.784, 0.737, 0.898)
+
+#We define IMBALANCE (Scale (standardise) each statistic above):
+namsisc <- scale(namsi); invkapsc <- scale(invkap); ginisc <- scale(gini)
+imbalance <- (namsisc[c(1:6),] + invkapsc[c(1:6),] + ginisc[c(1:6),])/3
+#The [c(1:6),] cuts off the sd and mean attributes from the scaled data
+
+#We define the LEVEL OF ATTACK - Shots Per Game / Goals Per Game.
+attack <- NULL; attackPO <- NULL
+for (l in 1:5){
+  for (s in seasons){
+    dataTemp <- read.csv(paste0("https://www.football-data.co.uk/mmz4281/", s, "/", co.we[l], ".csv"))
+    dataTemp <- dataTemp[ ,c("FTHG", "FTAG", "HS", "AS")]
+    dataTemp$totalGoals <- with(dataTemp, FTHG+FTAG)
+    dataTemp$totalShots <- with(dataTemp, HS+AS)
+    dataTemp <- na.omit(dataTemp)
+    attack <- c(attack, mean(dataTemp$totalShots)/mean(dataTemp$totalGoals))
+  }
+}
+for (s in seasons[13:15]){ 
+  #Data for Po is only avaliable for the 17/18 season onwards.
+  dataTemp <- read.csv(paste0("https://www.football-data.co.uk/mmz4281/", s, "/", co.we[6], ".csv"))
+  dataTemp <- dataTemp[ ,c("FTHG", "FTAG", "HS", "AS")]
+  dataTemp$totalGoals <- with(dataTemp, FTHG+FTAG)
+  dataTemp$totalShots <- with(dataTemp, HS+AS)
+  attackPO <- c(attackPO, mean(dataTemp$totalShots)/mean(dataTemp$totalGoals))
+}
+attack <- matrix(attack, ncol=15, byrow = T)
+attackPO <- matrix(attackPO, nrow=1, byrow = T)
+colnames(attack) <- seasons; rownames(attack) <- countries[1:5]
+colnames(attackPO) <- seasons[13:15]; rownames(attackPO) <- countries[6]
+
+attack.league <- c(mean(attack[1,]), mean(attack[2,]), mean(attack[3,]), mean(attack[4,]), mean(attack[5,]), mean(attackPO[1,]))
+attack.season <- NULL
+for (i in 1:12){attack.season <- c(attack.season, mean(attack[,i]))}
+for (i in 1:3){attack.season <- c(attack.season, mean(c(attack[1,(i+12)], attack[2,(i+12)], attack[3,(i+12)], attack[4,(i+12)], attack[5,(i+12)], attackPO[1,i] )))}
+
+#We define PredAcc, as the normalised sum of the 4 predictive statistics
+#We will take the inverse of RMSE and P2 so a high PredAcc value => better bookmaker performance
+invrmse.l <- 1/RMSE.O; invp2.l <- 1/p2.split
+rsqu.l.sc <- scale(RSqu.O); invrmse.l.sc <- scale(invrmse.l)
+p1.l.sc <- scale(p1.split); invp2.l.sc <- scale(invp2.l)
+predacc <- (rsqu.l.sc + invrmse.l.sc + p1.l.sc + invp2.l.sc)/4
+
+pc.league <- matrix(c(imbalance, attack.league, predacc), ncol=3, byrow=F)
+colnames(pc.league) <- c("imbalance", "attack", "predacc")
+rownames(pc.league) <- countries
+
+league.model <- prcomp(pc.league)
+league.model$rotation; summary(league.model)
+
+##SEASON MODEL:
+pc.season <- matrix(c(rsqu.season, (1/rmse.season), p1.season, (1/p2.season), attack.season), ncol = 5, byrow=F)
+colnames(pc.season) <- c("rsqu", "inv rmse", "p1", "inv p2", "attack")
+rownames(pc.season) <- seasons
+pc.season.sc <- scale(pc.season)
+
+season.model <- prcomp(pc.season.sc)
+summary(season.model); round(season.model$rotation,3)
+
+##PLOTS:
+#League Model Plots
+leascree <- ggplot(NULL, aes(x = c(1:3), y = (league.model$sdev)^2)) + 
+  geom_line() + geom_point(size = 2) + theme_light() +
+  geom_abline(slope = 0, intercept = 1, color = "red") +
+  labs(x = "Principal Component", y = "Variances", title = "Screeplot of League PCA Components")
+
+leamodlabels <- NULL
+for(i in countries){
+  if(league.model$x[i,1] > 0){
+    leamodlabels[i] <- round(league.model$x[i,1],2) + 0.33
+  }
+  else{leamodlabels[i] <- round(league.model$x[i,1],2) - 0.33}
+}
+
+leacomps <- ggplot(NULL, aes(countries, league.model$x[,1], color = countries, label = round(league.model$x[,1],2))) + 
+  geom_pointrange(ymin = 0, ymax = league.model$x[,1]) + theme_light() + 
+  labs(x = "Country", title = "PC1 Values", y = "Component 1") + 
+  theme(legend.position = "none") + 
+  scale_x_discrete(labels=c("po" = "Portugal", "it" = "Italy", "fr" = "France", "es" = "Spain", "en" = "England", "de" = "Germany")) + 
+  geom_text(aes(y = leamodlabels)) + coord_cartesian(ylim = c(-3,3))
+
+leaguepca <- grid.arrange(leascree, leacomps, ncol = 2, top = "By-League PCA") 
+
+#Season Model Plots
+seascree <- ggplot(NULL, aes(x = c(1:5), y = (season.model$sdev)^2)) + 
+  geom_line() + geom_point(size = 2) + theme_light() + 
+  geom_abline(slope = 0, intercept = 1, color = "red") +
+  labs(x = "Principal Component", y = "Variances", title = "Screeplot of Season PCA Components")
+
+seacomps <- ggplot(NULL, aes(x = season.model$x[,1], y = season.model$x[,2], label = seasons)) + 
+  geom_jitter() + labs(x = 'Component 1', y = 'Component 2', main = "PC1 vs. PC2") + 
+  theme_light() + geom_text(aes(x = season.model$x[,1], y = season.model$x[,2]-0.2))
+
+seasonpca <- grid.arrange(seascree, seacomps, ncol = 2, top = "By-Season PCA") 
+```
+
+## 2.9 Conclusion
+
+In this chapter, it has been shown that the levels of bookmaker accuracy are high in the 1X2 Home Win and Away Win markets: in each of the elite European leagues, the coefficient of determination $R^2$ was above 95% with the RMSE below 0.055. From the scatter plot produced, the linear models for Home and Away Wins have a much lower standard error (and therefore a narrower CI) than the model for Draws. This indicates that whilst bookmakers enjoy high accuracy with clear results, their predictions for Draws are poor, and have large room for improvement. In addition, it has been shown that the accuracy is impacted by the competitive balance in each league: bookmakers perform better in countries in imbalanced leagues, such as Portugal's Primiera Liga and Italy's Serie A, than in balanced leagues, such as Germany's Bundesliga and France's Ligue Une.
+
+# 3 English & Scottish Leagues
+
+## 3.1 Exploratory Data Analysis
+
+As we have tested the data source, we continue by conducting EDA on our next dataset. I have hidden the code for it, as it is long and repetitive, but it also includes finding the 'correct' and 'incorrect' probabilities for the Under/Over 2.5 Goals and <a href="https://help.smarkets.com/hc/en-gb/articles/115001324169-What-is-Asian-Handicap-betting-">Asian Handicap</a> markets.
+
+```{r edaensco_load, message=FALSE, warning=FALSE, include=FALSE}
+divisions <- c("E0", "E1", "E2", "E3", "EC", "SC0", "SC1", "SC2", "SC3")
+levels <- c("1", "2", "3")
+seasons <- c("0506", "0607", "0708", "0809", "0910", "1011", "1112", "1213", "1314", "1415", "1516", "1617", "1718", "1819", "1920")
+
+enscoTemp <- NULL; ensco <- NULL
+for (i in seasons){
+  for (j in divisions){
+    enscoTemp <- read.csv(paste0("https://www.football-data.co.uk/mmz4281/", i, "/", j, ".csv"), fileEncoding="latin1")
+    enscoTemp$Season <- with(enscoTemp, i)
+    enscoTemp$Div <- with(enscoTemp, j)
+    if (i=="1920"){
+      enscoTemp$BbAvH <- enscoTemp$AvgH
+      enscoTemp$BbAvA <- enscoTemp$AvgA
+      enscoTemp$BbAvD <- enscoTemp$AvgD
+      enscoTemp$BbAv.2.5 <- enscoTemp$Avg.2.5 
+      enscoTemp$BbAv.2.5.1 <- enscoTemp$Avg.2.5.1
+      enscoTemp$BbAvAHH <- enscoTemp$AvgAHH
+      enscoTemp$BbAvAHA <- enscoTemp$AvgAHA
+      enscoTemp$BbAHh <- enscoTemp$AHh}
+    else{}
+    enscoTemp$Over2.5Odds <- enscoTemp$BbAv.2.5
+    enscoTemp$Under2.5Odds <- enscoTemp$BbAv.2.5.1
+    #Greater Than or Less Than don't copy through: 
+    #A manual check confirms this is the right way round
+    enscoTemp$HomeHandicap <- enscoTemp$BbAHh
+    enscoTemp <- enscoTemp[,c("Div", "Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR", "BbAvH", "BbAvD", "BbAvA", "Over2.5Odds", "Under2.5Odds", "HomeHandicap", "BbAvAHH", "BbAvAHA", "Season")]
+    ensco <- rbind(ensco, enscoTemp)
+  }
+}
+ensco<-na.omit(ensco)
+
+### NORMALISING PROBS, FINDING WINNING BETS ----
+
+#Defining the league 'level':   1 - Elite (EPL, SPL, Championship);
+#                               2 - Fully Professional Lower Leagues;
+#                               3 - Semi-Professional Lower Leagues.
+ensco$Level<-with(ensco, rep(0, nrow(ensco)))
+for (k in 1:(nrow(ensco))){
+  if (ensco$Div[k]=="E0"){ensco$Level[k]<-1}
+  else if (ensco$Div[k]=="E1"){ensco$Level[k]<-1}
+  else if (ensco$Div[k]=="E2"){ensco$Level[k]<-2}
+  else if (ensco$Div[k]=="E3"){ensco$Level[k]<-2}
+  else if (ensco$Div[k]=="EC"){ensco$Level[k]<-3}
+  else if (ensco$Div[k]=="SC0"){ensco$Level[k]<-1}
+  else if (ensco$Div[k]=="SC1"){ensco$Level[k]<-2}
+  else if (ensco$Div[k]=="SC2"){ensco$Level[k]<-3}
+  else if (ensco$Div[k]=="SC3"){ensco$Level[k]<-3}
+  else{}
+}
+
+#Adding and normalising Probability columns
+#Pre Normalised:-
+  #1X2 Market
+    ensco$AvgHProbPN <- with(ensco, round(1/BbAvH, 4))
+    ensco$AvgDProbPN <- with(ensco, round(1/BbAvD, 4))
+    ensco$AvgAProbPN <- with(ensco, round(1/BbAvA, 4))
+  #Under/Over 2.5 goals market
+    ensco$Over2.5ProbPN <-  with(ensco, round(1/Over2.5Odds, 4))
+    ensco$Under2.5ProbPN <- with(ensco, round(1/Under2.5Odds, 4))
+  #Asian Handicap Markets
+    ensco$AH.HProbPN <- with(ensco, round(1/BbAvAHH, 4))
+    ensco$AH.AProbPN <- with(ensco, round(1/BbAvAHA, 4))
+#Finding Overrounds:-
+    ensco$OneXTwoOverround <- with(ensco, (AvgHProbPN + AvgDProbPN + AvgAProbPN))
+    ensco$UnderOverOverround <- with(ensco, (Over2.5ProbPN + Under2.5ProbPN))
+    ensco$AHOverround <- with(ensco, (AH.HProbPN + AH.AProbPN))
+#Normalising
+    ensco$AvgHProb <- with(ensco, round(AvgHProbPN/OneXTwoOverround, 4))
+    ensco$AvgDProb <- with(ensco, round(AvgDProbPN/OneXTwoOverround, 4))
+    ensco$AvgAProb <- with(ensco, round(AvgAProbPN/OneXTwoOverround, 4))
+    ensco$Over2.5Prob <- with(ensco, round(Over2.5ProbPN/UnderOverOverround, 4))
+    ensco$Under2.5Prob <- with(ensco, round(Under2.5ProbPN/UnderOverOverround, 4))
+    ensco$AH.HProb <- with(ensco, round(AH.HProbPN/AHOverround, 4))
+    ensco$AH.AProb <- with(ensco, round(AH.AProbPN/AHOverround, 4))
+    
+#A few important notes:
+#Rangers had a -275 goal handicap vs. East Fife; assume this meant -2.75:
+ensco$HomeHandicap[ensco$HomeTeam=="Rangers" & ensco$Date=="11/01/14"] <- -2.75
+#Hamilton had a 12.5 goal handicap vs. Rangers; assume this meant 1.25:
+ensco$HomeHandicap[ensco$HomeTeam=="Hamilton" & ensco$Date=="25/10/08"] <- 1.25
+    
+#"Correct" Results -- Straight forward for the 1X2 and U/O Markets:
+N = nrow(ensco)
+ensco$Correct1X2 <- with(ensco, rep(0,N))
+ensco$IncorrectA1X2 <- with(ensco, rep(0,N))
+ensco$IncorrectB1X2 <- with(ensco, rep(0,N))
+ensco$TotGoals <- with(ensco, FTHG + FTAG)
+ensco$CorrectUO <- with(ensco, rep(0,N))
+ensco$IncorrectUO <- with(ensco, rep(0,N))
+
+for (l in 1:N){
+  if (ensco$FTR[l] == "H"){
+    ensco$Correct1X2[l] <- ensco$Correct1X2[l] + ensco$AvgHProb[l]
+    ensco$IncorrectA1X2[l] <- ensco$IncorrectA1X2[l] + ensco$AvgAProb[l]
+    ensco$IncorrectB1X2[l] <- ensco$IncorrectB1X2[l] + ensco$AvgDProb[l]}
+  else if (ensco$FTR[l] == "D"){
+    ensco$Correct1X2[l] <- ensco$Correct1X2[l] + ensco$AvgDProb[l]
+    ensco$IncorrectA1X2[l] <- ensco$IncorrectA1X2[l] + ensco$AvgAProb[l]
+    ensco$IncorrectB1X2[l] <- ensco$IncorrectB1X2[l] + ensco$AvgHProb[l]}
+  else if (ensco$FTR[l] == "A"){
+    ensco$Correct1X2[l] <- ensco$Correct1X2[l] + ensco$AvgAProb[l]
+    ensco$IncorrectA1X2[l] <- ensco$IncorrectA1X2[l] + ensco$AvgHProb[l]
+    ensco$IncorrectB1X2[l] <- ensco$IncorrectB1X2[l] + ensco$AvgDProb[l]}
+  else{}
+  if (ensco$TotGoals[l] > 2.5){
+    ensco$CorrectUO[l] <- ensco$CorrectUO[l] + ensco$Over2.5Prob[l]
+    ensco$IncorrectUO[l] <- ensco$IncorrectUO[l] + ensco$Under2.5Prob[l]}
+  else if (ensco$TotGoals[l] < 2.5){
+    ensco$CorrectUO[l] <- ensco$CorrectUO[l] + ensco$Under2.5Prob[l]
+    ensco$IncorrectUO[l] <- ensco$IncorrectUO[l] + ensco$Over2.5Prob[l]}
+  else{}
+}
+
+ensco$uo.res <- NULL
+for (b in 1:N){
+  if (ensco$TotGoals[b] > 2.5){ensco$uo.res[b] <- "over"}
+  else {ensco$uo.res[b] <- "under"}
+}
+
+#For Asian Handicaps, we need to work out the winner(s)
+ensco$FTHG.ah <- with(ensco, rep(0,N))
+for (m in 1:N){ensco$FTHG.ah[m] <- ensco$FTHG[m] + ensco$HomeHandicap[m]}
+
+#There are 3 types of AH bets: Assume the bookie bets on the HOME team
+#   Integer: e.g. +1 Handicap for home team
+          ##  EVENT                                   #Winner
+          # - If there is a draw, or home team wins   Home
+          # - If away teams by 1 goal                 Void (stake refund)
+          # - If away team wins by more than 1 goal   Away
+#   Half: e.g. +0.5 Handicap for the home team
+          # - If the home team wins, or it is a draw  Home wins
+          # - If the away team wins                   Away
+#   Quarter: e.g. +0.75 Handicap for the home team
+#         Half the stake goes to +1, Half goes to +0.5
+          # - If the home team wins                   Home
+          # - If the game is a draw                   Home wins
+          # - If away team wins by 1 goal             HalfAway wins
+          # - If away wins by more than 1 goal        Away wins
+
+ensco$ah.gap <- with(ensco, FTHG.ah - FTAG); ensco$ah.res <- NULL
+for (n in 1:N){
+  if (ensco$ah.gap[n]<(-0.25)){ensco$ah.res[n]<-"aw"}
+  else if (ensco$ah.gap[n]==(-0.25)){ensco$ah.res[n]<-"hfaw"}
+  else if (ensco$ah.gap[n]==0){ensco$ah.res[n]<-"vo"}
+  else if (ensco$ah.gap[n]==0.25){ensco$ah.res[n]<-"hfhm"}
+  else if (ensco$ah.gap[n]>0.25){ensco$ah.res[n]<-"hm"}
+  else{}
+}
+
+ensco$CorrectAH <- with(ensco, rep(0,N))
+ensco$IncorrectAH <- with(ensco, rep(0,N))
+#Only considering the FULL wins, rather than half.
+for (l in 1:N){
+  if (ensco$ah.res[l] == "hm"){
+    ensco$CorrectAH[l] <- ensco$CorrectAH[l] + ensco$AH.HProb[l]
+    ensco$IncorrectAH[l] <- ensco$IncorrectAH[l] + ensco$AH.AProb[l]}
+  else if (ensco$ah.res[l] == "aw"){
+    ensco$CorrectAH[l] <- ensco$CorrectAH[l] + ensco$AH.AProb[l]
+    ensco$IncorrectAH[l] <- ensco$IncorrectAH[l] + ensco$AH.HProb[l]}
+  else{}
+}
+```
+
+We find the basic calculations (mean, standard deviations) as before for the new dataset.
+
+```{r enscobasiccalcs, message=FALSE, warning=FALSE}
+basic.1x2 <- NULL
+for (a in 1:3){basic.1x2 <- c(basic.1x2, mean(ensco$AvgHProb[ensco$Level == a]))}
+for (a in 1:3){basic.1x2 <- c(basic.1x2, mean(ensco$AvgDProb[ensco$Level == a]))}
+for (a in 1:3){basic.1x2 <- c(basic.1x2, mean(ensco$AvgAProb[ensco$Level == a]))}
+for (a in 1:3){basic.1x2 <- c(basic.1x2, sd(ensco$AvgHProb[ensco$Level == a]))}
+for (a in 1:3){basic.1x2 <- c(basic.1x2, sd(ensco$AvgDProb[ensco$Level == a]))}
+for (a in 1:3){basic.1x2 <- c(basic.1x2, sd(ensco$AvgAProb[ensco$Level == a]))}
+
+basic.1x2 <- matrix(c(basic.1x2), ncol=3, byrow=T)
+colnames(basic.1x2) <- 1:3
+rownames(basic.1x2) <- c("1x2 Home Mean", "1x2 Draw Mean", "1x2 Away Mean", "1x2 Home SD", "1x2 Draw SD", "1x2 Away SD")
+
+#Under/Over:
+basic.uo <- NULL
+for (a in 1:3){basic.uo <- c(basic.uo, mean(ensco$Under2.5Prob[ensco$Level == a]))}
+for (a in 1:3){basic.uo <- c(basic.uo, mean(ensco$Over2.5Prob[ensco$Level == a]))}
+for (a in 1:3){basic.uo <- c(basic.uo, sd(ensco$Under2.5Prob[ensco$Level == a]))}
+for (a in 1:3){basic.uo <- c(basic.uo, sd(ensco$Over2.5Prob[ensco$Level == a]))}
+
+basic.uo <- matrix(c(basic.uo), ncol=3, byrow=T)
+colnames(basic.uo) <- 1:3
+rownames(basic.uo) <- c("Under 2.5 Mean", "Over 2.5 Mean", "Under 2.5 SD", "Over 2.5 SD")
+
+#Asian Handicaps: 
+basic.ah <- NULL
+for (a in 1:3){basic.ah <- c(basic.ah, mean(ensco$AH.HProb[ensco$Level == a]))}
+for (a in 1:3){basic.ah <- c(basic.ah, mean(ensco$AH.AProb[ensco$Level == a]))}
+for (a in 1:3){basic.ah <- c(basic.ah, sd(ensco$AH.HProb[ensco$Level == a]))}
+for (a in 1:3){basic.ah <- c(basic.ah, sd(ensco$AH.AProb[ensco$Level == a]))}
+
+basic.ah <- matrix(c(basic.ah), ncol=3, byrow=T)
+colnames(basic.ah) <- 1:3
+rownames(basic.ah) <- c("AH Home Mean", "AH Away Mean", "AH Home SD", "AH Away SD")
+
+basic.calcs <- round(rbind(basic.1x2, basic.uo, basic.ah),4)
+
+#Observed Probabilities
+obsprob.1x2tab <- round(prop.table(table(ensco$FTR, ensco$Level),2), 4)[c(1,2,3), c(1,2,3)]
+obsprob.uotab <- round(prop.table(table(ensco$uo.res, ensco$Level),2),4)[c(1,2), c(1,2,3)]
+obsprob.ahtab <- round(prop.table(table(ensco$ah.res, ensco$Level),2),4)[c("hm", "hfhm", "vo", "hfaw", "aw"),]
+
+#To find the % of AH full wins that are home wins
+print(nrow(ensco[ensco$ah.res == "hm",]) / (nrow(ensco[ensco$ah.res == "hm",]) + nrow(ensco[ensco$ah.res == "aw",])))
+
+#Finding this by Level
+AH.Basic.Proportions <- NULL
+for (i in levels){
+  tempH <- nrow(ensco[ensco$ah.res == "hm" & ensco$Level == i,])
+  tempA <- nrow(ensco[ensco$ah.res == "aw" & ensco$Level == i,])
+  tempProp <- tempH / (tempH + tempA)
+  AH.Basic.Proportions <- c(AH.Basic.Proportions, tempProp)
+}
+AH.Basic.Proportions <- as.matrix(AH.Basic.Proportions, nrow = 1, ncol = 3)
+rownames(AH.Basic.Proportions) <- paste("Level",levels)
+AH.Basic.Proportions
+
+basic.calcs; obsprob.1x2tab; obsprob.uotab; obsprob.ahtab
+
+```
+
+Interestingly, we notice less variation in the Level 2 market than Level 3 across all levels. Also, for each category, the observed proportion and consensus mean probabilities are very close, a good initial indicator of strong performance. This is backed up by <b>visual analysis</b>, given in the paper.
+
+## 3.2 Correlation Analysis
+
+As with before, we create linear models to find values of $R^2$ and RMSE in order to assess accuracy. The code to create the models is hidden, due to it being the same as before.
+
+```{r enscocorranalysis, echo=FALSE, message=FALSE, warning=FALSE}
+#Cutting and defining the levels:
+ensco$AvgHProb.cut <- cut(ensco$AvgHProb, 50, include.lowest=T)
+levels(ensco$AvgHProb.cut) <- tapply(ensco$AvgHProb, ensco$AvgHProb.cut, mean)
+ensco$AvgDProb.cut <- cut(ensco$AvgDProb, 50, include.lowest=T)
+levels(ensco$AvgDProb.cut) <- tapply(ensco$AvgDProb, ensco$AvgDProb.cut, mean)
+ensco$AvgAProb.cut <- cut(ensco$AvgAProb, 50, include.lowest=T)
+levels(ensco$AvgAProb.cut) <- tapply(ensco$AvgAProb, ensco$AvgAProb.cut, mean)
+
+ensco$Over2.5Prob.cut <- cut(ensco$Over2.5Prob, 50, include.lowest=T) 
+levels(ensco$Over2.5Prob.cut) <- tapply(ensco$Over2.5Prob, ensco$Over2.5Prob.cut, mean)
+
+ensco$AH.HProb.cut <- cut(ensco$AH.HProb, 50, include.lowest=T)
+levels(ensco$AH.HProb.cut) <- tapply(ensco$AH.HProb, ensco$AH.HProb.cut, mean)
+ensco$AH.AProb.cut <- cut(ensco$AH.AProb, 50, include.lowest=T)
+levels(ensco$AH.AProb.cut) <- tapply(ensco$AH.AProb, ensco$AH.AProb.cut, mean)
+
+#Observed Probability for each cut:
+obsprob.1x2.H <- prop.table(table(ensco$FTR, ensco$AvgHProb.cut), 2)[3,]
+booprob.1x2.H <- as.numeric(names(obsprob.1x2.H))
+obsprob.1x2.D <- prop.table(table(ensco$FTR, ensco$AvgDProb.cut), 2)[2,]
+booprob.1x2.D <- as.numeric(names(obsprob.1x2.D))
+obsprob.1x2.A <- prop.table(table(ensco$FTR, ensco$AvgAProb.cut), 2)[1,]
+booprob.1x2.A <- as.numeric(names(obsprob.1x2.A))
+
+booprob.1x2 <- c(booprob.1x2.H,booprob.1x2.D,booprob.1x2.A)
+obsprob.1x2 <- c(obsprob.1x2.H,obsprob.1x2.D,obsprob.1x2.A)
+
+obsprob.uo <- prop.table(table(ensco$uo.res, ensco$Over2.5Prob.cut), 2)[1,]
+booprob.uo <- as.numeric(names(obsprob.uo))
+
+#For AH bets, we will only take full wins:
+obsprob.ah.H <- prop.table(table(ensco$ah.res, ensco$AH.HProb.cut), 2)[4,] #4 = Home
+booprob.ah.H <- as.numeric(names(obsprob.ah.H))
+obsprob.ah.A <- prop.table(table(ensco$ah.res, ensco$AH.AProb.cut), 2)[1,] #1 = Away
+booprob.ah.A <- as.numeric(names(obsprob.ah.A))
+
+booprob.ah <- c(booprob.ah.H, booprob.ah.A)
+obsprob.ah <- c(obsprob.ah.H, obsprob.ah.A)
+
+#Final models
+model.1x2.h <- lm(obsprob.1x2.H~booprob.1x2.H)
+model.1x2.d <- lm(obsprob.1x2.D~booprob.1x2.D)
+model.1x2.a <- lm(obsprob.1x2.A~booprob.1x2.A)
+model.1x2.o <- lm(obsprob.1x2~booprob.1x2)
+model.uo <- lm(obsprob.uo~booprob.uo)
+model.ah <- lm(obsprob.ah~booprob.ah)
+
+#R Squared and RMSE values:-
+rsrm.val.1x2 <- matrix(c(summary(model.1x2.h)$r.squared, summary(model.1x2.d)$r.squared, summary(model.1x2.a)$r.squared, sqrt(mean(model.1x2.h$residuals^2)), sqrt(mean(model.1x2.d$residuals^2)), sqrt(mean(model.1x2.a$residuals^2)) ), ncol = 3, nrow = 2, byrow=T, dimnames = list(c("RSq", "RMSE"), c("1X2: H", "D", "A")))
+rsrm.val.uoah <- matrix(c(summary(model.uo)$r.squared, summary(model.ah)$r.squared, sqrt(mean(model.uo$residuals^2)), sqrt(mean(model.ah$residuals^2)) ), ncol = 2, nrow = 2, byrow=T, dimnames = list(c("RSq", "RMSE"), c("Under/Over", "AH")))
+
+print(rsrm.val.1x2)
+print(rsrm.val.uoah)
+```
+
+In addition, we can review plots for each of the markets.
+
+```{r enscocorrplots, message=FALSE, warning=FALSE}
+convobs.1x2 <- ggplot(data=NULL, aes()) + geom_smooth() +
+  geom_jitter(aes(x=booprob.1x2.H, y=obsprob.1x2.H, color="1X2 Home"), size=0.75) +
+  geom_smooth(aes(x=booprob.1x2.H, y=obsprob.1x2.H, color="1X2 Home"), method=lm) +
+  geom_jitter(aes(x=booprob.1x2.D, y=obsprob.1x2.D, color="1X2 Draw"), size=0.75) +
+  geom_smooth(aes(x=booprob.1x2.D, y=obsprob.1x2.D, color="1X2 Draw"), method=lm) +
+  geom_jitter(aes(x=booprob.1x2.A, y=obsprob.1x2.A, color="1X2 Away"), size=0.75) +
+  geom_smooth(aes(x=booprob.1x2.A, y=obsprob.1x2.A, color="1X2 Away"), method=lm) +
+  geom_abline(intercept=0, slope=1, linetype="dashed") + theme_light() + 
+  labs(x = "Bookmaker Consensus Probability", y = "Observed Probability", caption="Eng/Sco 05-20") + scale_color_manual(name="Bet Type", values=c("1X2 Home" = "blue", "1X2 Draw" = "green4", "1X2 Away" = "coral")) + coord_cartesian(xlim=c(0,1), ylim=c(0,1))
+  
+convobs.uo <- ggplot(data=NULL, aes()) + geom_smooth() +
+  geom_jitter(aes(x=booprob.uo, y=obsprob.uo, color="Under/Over"), size=0.75) +
+  geom_smooth(aes(x=booprob.uo, y=obsprob.uo, color="Under/Over"), method=lm) +
+  geom_abline(intercept=0, slope=1, linetype="dashed") + theme_light() +
+  labs(x = "Bookmaker Consensus Probability", y = "Observed Probability",  caption="Eng/Sco 05-20") + scale_color_manual(name="Bet Type", values=c("Under/Over" = "red")) + coord_cartesian(xlim=c(0,1), ylim=c(0,1))
+
+convobs.ah <- ggplot(data=NULL, aes()) + geom_smooth() +
+  geom_jitter(aes(x=booprob.ah.H, y=obsprob.ah.H, color="AH Home"), size=0.75) +
+  geom_smooth(aes(x=booprob.ah.H, y=obsprob.ah.H, color="AH Home"), method=lm) +
+  geom_jitter(aes(x=booprob.ah.A, y=obsprob.ah.A, color="AH Away"), size=0.75) +
+  geom_smooth(aes(x=booprob.ah.A, y=obsprob.ah.A, color="AH Away"), method=lm) +
+  geom_abline(intercept=0, slope=1, linetype="dashed") + theme_light() +
+  labs(x = "Bookmaker Consensus Probability", y = "Observed Probability",  caption="Eng/Sco 05-20") + scale_color_manual(name="Bet Type", values=c("AH Home" = "blue", "AH Away" = "coral")) + coord_cartesian(xlim=c(0,1), ylim=c(0,1))
+```
+
+## 3.3 Comparing Levels
+
+To further analyse this, we can compare the results and plots for each level.
+
+```{r enscoplotsperlevel}
+for (j in levels){
+  DataTemp <- ensco[ensco$Level==j,]
+  print(paste0("For level ",j,", n = ",nrow(DataTemp)))
+}
+
+#Initialising variables
+rsqu.level <- NULL; rmse.level <- NULL; rsqu.level.1x2 <- NULL; rmse.level.1x2 <- NULL; 
+rsqu.level.uo <- NULL; rmse.level.uo <- NULL; rsqu.level.ah <- NULL; rmse.level.ah <- NULL; 
+p1.level <- NULL; p2.level <- NULL; p1.uo.level <- NULL; p2.uo.level <- NULL; p1.ah.level <- NULL; p2.ah.level <- NULL
+slope.level.1x2 <- NULL; slope.level.uo <- NULL; slope.level.ah <- NULL
+
+ensco$LogCorrect1x2 <- with(ensco, log(ensco$Correct1X2))
+ensco$LogCorrectUO <- with(ensco, log(ensco$CorrectUO))
+
+#As we're taking the log and results with AH voids/half-wins, we create a subset:
+ensco.ah.results <- ensco[ensco$CorrectAH > 0,]
+ensco.ah.results$LogCorrectAH <- with(ensco.ah.results, log(ensco.ah.results$CorrectAH))
+
+#n.b. We don't do a model for each -- just an overall 1x2, AH and U/O. 
+#     P1 and P2 is based purely on the 1X2 market.
+
+for (j in levels){
+  dataTemp <- ensco[ensco$Level==j,]
+  dataTempAH <- ensco.ah.results[ensco.ah.results$Level==j,] #For AH P Values
+  dataTemp$AvgHProb.cut <- cut(dataTemp$AvgHProb, 35, include.lowest = T)
+  levels(dataTemp$AvgHProb.cut) <- tapply(dataTemp$AvgHProb, dataTemp$AvgHProb.cut, mean)
+  dataTemp$AvgDProb.cut <- cut(dataTemp$AvgDProb, 15, include.lowest = T)
+  levels(dataTemp$AvgDProb.cut) <- tapply(dataTemp$AvgDProb, dataTemp$AvgDProb.cut, mean)
+  dataTemp$AvgAProb.cut <- cut(dataTemp$AvgAProb, 35, include.lowest = T)
+  levels(dataTemp$AvgAProb.cut) <- tapply(dataTemp$AvgAProb, dataTemp$AvgAProb.cut, mean)
+  
+  dataTemp$Over2.5Prob.cut <- cut(dataTemp$Over2.5Prob, 35, include.lowest = T)
+  levels(dataTemp$Over2.5Prob.cut) <- tapply(dataTemp$Over2.5Prob, dataTemp$Over2.5Prob.cut, mean)
+
+  dataTemp$AH.HProb.cut <- cut(dataTemp$AH.HProb, 35, include.lowest = T)
+  levels(dataTemp$AH.HProb.cut) <- tapply(dataTemp$AH.HProb, dataTemp$AH.HProb.cut, mean)
+  dataTemp$AH.AProb.cut <- cut(dataTemp$AH.AProb, 35, include.lowest = T)
+  levels(dataTemp$AH.AProb.cut) <- tapply(dataTemp$AH.AProb, dataTemp$AH.AProb.cut, mean)
+  
+  obs.1x2.h <- prop.table(table(dataTemp$FTR, dataTemp$AvgHProb.cut), 2)[3,]
+  obs.1x2.d <- prop.table(table(dataTemp$FTR, dataTemp$AvgDProb.cut), 2)[2,]
+  obs.1x2.a <- prop.table(table(dataTemp$FTR, dataTemp$AvgAProb.cut), 2)[1,]
+  obs.1x2 <- c(obs.1x2.h, obs.1x2.d, obs.1x2.a)
+  
+  boo.1x2.h <- as.numeric(names(obs.1x2.h))
+  boo.1x2.d <- as.numeric(names(obs.1x2.d))
+  boo.1x2.a <- as.numeric(names(obs.1x2.a))
+  boo.1x2 <- c(boo.1x2.h, boo.1x2.d, boo.1x2.a)
+  
+  obs.uo <- prop.table(table(dataTemp$uo.res, dataTemp$Over2.5Prob.cut), 2)[1,]
+  boo.uo <- as.numeric(names(obs.uo))
+  
+  obs.ah.h <- prop.table(table(dataTemp$ah.res, dataTemp$AH.HProb.cut), 2)[4,]
+  obs.ah.a <- prop.table(table(dataTemp$ah.res, dataTemp$AH.AProb.cut), 2)[1,]
+  obs.ah <- c(obs.ah.h, obs.ah.a)
+  
+  boo.ah.h <- as.numeric(names(obs.ah.h))
+  boo.ah.a <- as.numeric(names(obs.ah.a))
+  boo.ah <- c(boo.ah.h, boo.ah.a)
+  
+  modelTemp.1x2 <- lm(obs.1x2 ~ boo.1x2)
+  modelTemp.uo <- lm(obs.uo ~ boo.uo)
+  modelTemp.ah <- lm(obs.ah ~ boo.ah)
+  par(mfrow=c(3,1))
+  plot(modelTemp.1x2, 5, main = paste0("1X2 Market; Level ",j))
+  plot(modelTemp.uo, 5, main = paste0("UO Market; Level ",j))
+  plot(modelTemp.ah, 5, main = paste0("AH Market; Level ",j))
+  par(mfrow=c(1,1))
+  
+  plot.1x2 <- ggplot(NULL, aes(x=boo.1x2.h, y=obs.1x2.h, color="Home")) + 
+    geom_smooth(method="lm", alpha=0.3) + 
+    geom_smooth(aes(x=boo.1x2.a, y=obs.1x2.a, color="Away"), method="lm", alpha=0.3) + 
+    geom_smooth(aes(x=boo.1x2.d, y=obs.1x2.d, color="Draw"), method="lm", alpha=0.3) +
+    geom_jitter(aes(color="Home"), shape=1) + 
+    geom_jitter(aes(x=boo.1x2.a, y=obs.1x2.a, color="Away"), shape=1) + 
+    geom_jitter(aes(x=boo.1x2.d, y=obs.1x2.d, color="Draw"), shape=1) + 
+    geom_abline(slope=1, intercept=0, color="black", linetype="dashed") + 
+    coord_cartesian(xlim=c(0,1), ylim=c(0,1)) + labs(x = paste0("1X2 Bookmaker Consensus Probabilities: Level ",j), y = NULL) + scale_color_manual(name="Bet Type", values = c("Home" = "blue", "Away" = "coral", "Draw" = "green4")) + theme_light()
+  
+  plot.uo <- ggplot(NULL, aes(x=boo.uo, y=obs.uo, color="Over 2.5 Goals")) + 
+    geom_smooth(method="lm", alpha=0.3) + 
+    geom_jitter(shape=2) + 
+    geom_abline(slope=1, intercept=0, color="black", linetype="dashed") + 
+    coord_cartesian(xlim=c(0,1), ylim=c(0,1)) + labs(x=paste0("UO Bookmaker Consensus Probabilities: Level ",j), y=NULL) + scale_color_manual(name="Bet Type", values=c("Over 2.5 Goals" = "red")) + theme_light()
+  
+  plot.ah <- ggplot(NULL, aes(x=boo.ah.h, y=obs.ah.h, color="AH Home")) +
+    geom_smooth(method = "lm", alpha=0.3) + 
+    geom_smooth(aes(x=boo.ah.a, y=obs.ah.a, color="AH Away"), method="lm", alpha=0.3) + geom_jitter(shape=5) + 
+    geom_jitter(aes(x=boo.ah.a, y=obs.ah.a, color="AH Away"), method="lm", alpha=0.3) +
+    geom_abline(slope=1, intercept=0, color="black", linetype="dashed") + 
+    coord_cartesian(xlim=c(0,1), ylim=c(0,1)) + labs(x= paste0("AH Bookmaker Consensus Probabilities: Level ",j), y=NULL) + scale_color_manual(name="Bet Type", values=c("AH Home"="blue", "AH Away"="coral")) + theme_light()
+  
+  
+  plotTemp <- grid.arrange(plot.1x2, plot.uo, plot.ah, nrow=3, ncol=1, left="Observed Probability")
+  
+  rsqu.level.1x2 <- c(rsqu.level.1x2, round(summary(modelTemp.1x2)$r.squared, 5))
+  rmse.level.1x2 <- c(rmse.level.1x2, round(sqrt(mean(modelTemp.1x2$residuals^2)), 5))
+  rsqu.level.uo <- c(rsqu.level.uo, round(summary(modelTemp.uo)$r.squared, 5))
+  rmse.level.uo <- c(rmse.level.uo, round(sqrt(mean(modelTemp.uo$residuals^2)), 5))
+  rsqu.level.ah <- c(rsqu.level.ah, round(summary(modelTemp.ah)$r.squared, 5))
+  rmse.level.ah <- c(rmse.level.ah, round(sqrt(mean(modelTemp.ah$residuals^2)), 5))
+  
+  p1.temp <- exp(1/(nrow(dataTemp)) * sum(dataTemp$LogCorrect1x2))
+  p2.temp <- 1/(nrow(dataTemp))*sum((1 - dataTemp$Correct1X2)**2 + (dataTemp$IncorrectA1X2)**2 + (dataTemp$IncorrectB1X2)**2 )
+  p1.level <- c(p1.level, round(p1.temp, 5))
+  p2.level <- c(p2.level, round(p2.temp ,5))
+  
+  p1.uo.temp <- exp(1/(nrow(dataTemp)) * sum(dataTemp$LogCorrectUO))
+  p2.uo.temp <- 1/(nrow(dataTemp))*sum((1 - dataTemp$CorrectUO)**2 + (dataTemp$IncorrectUO)**2)
+  p1.uo.level <- c(p1.uo.level, round(p1.uo.temp, 5))
+  p2.uo.level <- c(p2.uo.level, round(p2.uo.temp ,5))
+  
+  p1.ah.temp <- exp(1/(nrow(dataTempAH)) * sum(dataTempAH$LogCorrectAH))
+  p2.ah.temp <- 1/(nrow(dataTempAH)) * sum((1 - dataTempAH$CorrectAH)**2 + (dataTempAH$IncorrectAH)**2)
+  p1.ah.level <- c(p1.ah.level, round(p1.ah.temp, 5))
+  p2.ah.level <- c(p2.ah.level, round(p2.ah.temp, 5))
+  
+  slope.level.1x2 <- c(slope.level.1x2, modelTemp.1x2$coefficients[2]) #Coefficients[2] is the gradient
+  slope.level.uo <- c(slope.level.uo, modelTemp.uo$coefficients[2])
+  slope.level.ah <- c(slope.level.ah, modelTemp.ah$coefficients[2])  
+}
+
+rmse.level <- matrix( c(rmse.level.1x2, rmse.level.uo, rmse.level.ah), ncol=3, byrow=T, dimnames = list(c("1x2", "UO", "AH"), levels))
+rsqu.level <- matrix( c(rsqu.level.1x2, rsqu.level.uo, rsqu.level.ah), ncol=3, byrow=T, dimnames = list(c("1x2", "UO", "AH"), levels))
+p.values.level <- matrix(c(p1.level, p2.level, p1.uo.level, p2.uo.level, p1.ah.level, p2.ah.level), ncol=3, byrow=T, dimnames = list(c("P1 1X2", "P2 1X2", "P1 UO", "P2 UO", "P1 AH", "P2 AH"), levels))
+slope.level <- matrix(c(slope.level.1x2, slope.level.uo, slope.level.ah), ncol = 3, byrow = F, dimnames = list(levels, c("1X2", "UO", "AH")))
+
+print(rmse.level)
+print(rsqu.level)
+print(p.values.level)
+print(slope.level)
+```
+
+## 2.4 Comparing Seasons
+
+In addition, we can see how the bookmaker accuracy has changed over time. It also makes sense to visualise these values, so we create a season-time plot for each value. The tables for these values are large, so are omitted here: they are in the final dissertation, though.
+
+```{r}
+rsqu.season.1x2 <- NULL; rmse.season.1x2 <- NULL; p1.season.1x2 <- NULL; p2.season.1x2 <- NULL
+rsqu.season.uo <- NULL; rmse.season.uo <- NULL; p1.season.uo <- NULL; p2.season.uo <- NULL
+rsqu.season.ah <- NULL; rmse.season.ah <- NULL; p1.season.ah <- NULL; p2.season.ah <- NULL
+slope.season.1x2 <- NULL; slope.season.uo <- NULL; slope.season.ah <- NULL
+
+for(i in seasons){
+  dataTemp <- ensco[ensco$Season == i, ]
+
+  dataTemp$AvgHProb.cut <- cut(dataTemp$AvgHProb, 10, include.lowest = T)
+  levels(dataTemp$AvgHProb.cut) <- tapply(dataTemp$AvgHProb, dataTemp$AvgHProb.cut, mean)
+  dataTemp$AvgDProb.cut <- cut(dataTemp$AvgDProb, 5, include.lowest = T)
+  levels(dataTemp$AvgDProb.cut) <- tapply(dataTemp$AvgDProb, dataTemp$AvgDProb.cut, mean)
+  dataTemp$AvgAProb.cut <- cut(dataTemp$AvgAProb, 10, include.lowest = T)
+  levels(dataTemp$AvgAProb.cut) <- tapply(dataTemp$AvgAProb, dataTemp$AvgAProb.cut, mean)
+  
+  dataTemp$Over2.5Prob.cut <- cut(dataTemp$Over2.5Prob, 10, include.lowest = T)
+  levels(dataTemp$Over2.5Prob.cut) <- tapply(dataTemp$Over2.5Prob, dataTemp$Over2.5Prob.cut, mean)
+  
+  dataTemp$AH.HProb.cut <- cut(dataTemp$AH.HProb, 10, include.lowest = T)
+  levels(dataTemp$AH.HProb.cut) <- tapply(dataTemp$AH.HProb, dataTemp$AH.HProb.cut, mean)
+  dataTemp$AH.AProb.cut <- cut(dataTemp$AH.AProb, 10, include.lowest = T)
+  levels(dataTemp$AH.AProb.cut) <- tapply(dataTemp$AH.AProb, dataTemp$AH.AProb.cut, mean)
+  
+  obs.1x2.h <- prop.table(table(dataTemp$FTR, dataTemp$AvgHProb.cut), 2)[3,]
+  obs.1x2.d <- prop.table(table(dataTemp$FTR, dataTemp$AvgDProb.cut), 2)[2,]
+  obs.1x2.a <- prop.table(table(dataTemp$FTR, dataTemp$AvgAProb.cut), 2)[1,]
+  obs.1x2 <- c(obs.1x2.h, obs.1x2.d, obs.1x2.a)
+  
+  boo.1x2.h <- as.numeric(names(obs.1x2.h))
+  boo.1x2.d <- as.numeric(names(obs.1x2.d))
+  boo.1x2.a <- as.numeric(names(obs.1x2.a))
+  boo.1x2 <- c(boo.1x2.h, boo.1x2.d, boo.1x2.a)
+  
+  obs.uo <- prop.table(table(dataTemp$uo.res, dataTemp$Over2.5Prob.cut), 2)[1,]
+  boo.uo <- as.numeric(names(obs.uo))
+  
+  obs.ah.h <- prop.table(table(dataTemp$ah.res, dataTemp$AH.HProb.cut), 2)[4,]
+  obs.ah.a <- prop.table(table(dataTemp$ah.res, dataTemp$AH.AProb.cut), 2)[1,]
+  obs.ah <- c(obs.ah.h, obs.ah.a)
+  
+  boo.ah.h <- as.numeric(names(obs.ah.h))
+  boo.ah.a <- as.numeric(names(obs.ah.a))
+  boo.ah <- c(boo.ah.h, boo.ah.a)
+  
+  modelTemp.1x2 <- lm(obs.1x2 ~ boo.1x2)
+  modelTemp.uo <- lm(obs.uo ~ boo.uo)
+  modelTemp.ah <- lm(obs.ah ~ boo.ah)
+  
+  rsqu.season.1x2 <- c(rsqu.season.1x2, round(summary(modelTemp.1x2)$r.squared, 5))
+  rmse.season.1x2 <- c(rmse.season.1x2, round(sqrt(mean(modelTemp.1x2$residuals^2)), 5))
+  rsqu.season.uo <- c(rsqu.season.uo, round(summary(modelTemp.uo)$r.squared, 5))
+  rmse.season.uo <- c(rmse.season.uo, round(sqrt(mean(modelTemp.uo$residuals^2)), 5))
+  rsqu.season.ah <- c(rsqu.season.ah, round(summary(modelTemp.ah)$r.squared, 5))
+  rmse.season.ah <- c(rmse.season.ah, round(sqrt(mean(modelTemp.ah$residuals^2)), 5))
+  
+  p1.temp <- exp(1/(nrow(dataTemp)) * sum(dataTemp$LogCorrect1x2))
+  p2.temp <- 1/(nrow(dataTemp))*sum((1 - dataTemp$Correct1X2)**2 + (dataTemp$IncorrectA1X2)**2 + (dataTemp$IncorrectB1X2)**2 )
+  p1.season.1x2 <- c(p1.season.1x2, round(p1.temp, 5))
+  p2.season.1x2 <- c(p2.season.1x2, round(p2.temp ,5))
+  
+  p1.uo.temp <- exp(1/(nrow(dataTemp)) * sum(dataTemp$LogCorrectUO))
+  p2.uo.temp <- 1/(nrow(dataTemp))*sum((1 - dataTemp$CorrectUO)**2 + (dataTemp$IncorrectUO)**2)
+  p1.season.uo<- c(p1.season.uo, round(p1.uo.temp, 5))
+  p2.season.uo <- c(p2.season.uo, round(p2.uo.temp, 5))
+  
+  dataTempAH <- ensco.ah.results[ensco.ah.results$Season == i, ]
+  
+  p1.ah.temp <- exp(1/(nrow(dataTempAH)) * sum(dataTempAH$LogCorrectAH))
+  p2.ah.temp <- 1/(nrow(dataTempAH)) * sum((1 - dataTempAH$CorrectAH)**2 + (dataTempAH$IncorrectAH)**2)
+  p1.season.ah <- c(p1.season.ah, round(p1.ah.temp, 5))
+  p2.season.ah <- c(p2.season.ah, round(p2.ah.temp, 5))
+  
+  slope.season.1x2 <- c(slope.season.1x2, modelTemp.1x2$coefficients[2]) #Coefficients[2] is the gradient
+  slope.season.uo <- c(slope.season.uo, modelTemp.uo$coefficients[2])
+  slope.season.ah <- c(slope.season.ah, modelTemp.ah$coefficients[2])
+}
+rmse.season <- matrix( c(rmse.season.1x2, rmse.season.uo, rmse.season.ah), ncol=3, byrow=F, dimnames = list(seasons, c("1x2", "UO", "AH")))
+rsqu.season <- matrix( c(rsqu.season.1x2, rsqu.season.uo, rsqu.season.ah), ncol=3, byrow=F, dimnames = list(seasons, c("1x2", "UO", "AH")))
+p.values.season <- matrix(c(p1.season.1x2, p2.season.1x2, p1.season.uo, p2.season.uo, p1.season.ah, p2.season.ah), ncol=15, byrow=T, dimnames = list(c("P1 1X2", "P2 1X2", "P1 UO", "P2 UO", "P1 AH", "P2 AH"), seasons))
+slope.season <- matrix(c(slope.season.1x2, slope.season.uo, slope.season.ah), ncol = 3, byrow = F, dimnames = list(seasons, c("1X2", "UO", "AH")))
+
+#To present these in the text, we use the following two matrices (lots of values => split over 2)
+accuracyvaluematrix.byseason1 <- round(matrix(c(rsqu.season[,1], rmse.season[,1], p1.season, p2.season, slope.season[,1], rsqu.season[,2], rmse.season[,2], p1.season.uo, p2.season.uo, slope.season[,2]), nrow = 15, byrow = F), 4)
+rownames(accuracyvaluematrix.byseason1) <- seasons
+accuracyvaluematrix.byseason2 <- round(matrix(c(rsqu.season[,3], rmse.season[,3], p1.season.ah, p2.season.ah, slope.season[,3]), nrow = 15, byrow = F), 4)
+rownames(accuracyvaluematrix.byseason2) <- seasons
+
+#Plotting these values -- We make 15 plots and arrange onto one figure after:
+rsqu.season.plot.1x2 <- ggplot(NULL, aes(y=rsqu.season.1x2, x=c(2005:2019))) + geom_jitter(color = "violetred1") + theme_light() + labs(x = 'Year', y = 'R2', title = 'R2, 1X2') + geom_smooth(method = 'lm', se = F, color = "violetred1")
+
+rmse.season.plot.1x2 <- ggplot(NULL, aes(y=rmse.season.1x2, x=c(2005:2019))) + geom_jitter(color = "violetred1") + theme_light() + labs(x = 'Year', y = 'RMSE', title = 'RMSE, 1X2') + geom_smooth(method = 'lm', se = F, color = "violetred1")
+
+p1.season.plot.1x2 <- ggplot(NULL, aes(y=p1.season.1x2, x=c(2005:2019))) + geom_jitter(color = "violetred1") + theme_light() + labs(x = 'Year', y = 'P1', title = 'P1, 1X2') + geom_smooth(method = 'lm', se = F, color = "violetred1")
+
+p2.season.plot.1x2 <- ggplot(NULL, aes(y=p2.season.1x2, x=c(2005:2019))) + geom_jitter(color = "violetred1") + theme_light() + labs(x = 'Year', y = 'P2', title = 'P2, 1X2') + geom_smooth(method = 'lm', se = F, color = "violetred1")
+
+slope.season.plot.1x2 <- ggplot(NULL, aes(y=slope.season.1x2, x=c(2005:2019))) + geom_jitter(color = "violetred1") + theme_light() + labs(x = 'Year', y = 'Slope', title = 'Slope, 1X2') + geom_smooth(method = 'lm', se = F, color = "violetred1") + geom_abline(slope = 0, intercept = 1, color = "black")
+
+rsqu.season.plot.uo <- ggplot(NULL, aes(y=rsqu.season.uo, x=c(2005:2019))) + geom_jitter(color = "dodgerblue4") + theme_light() + labs(x = 'Year', y = 'R2', title = 'R2, UO') + geom_smooth(method = 'lm', se = F, color = "dodgerblue4")
+
+rmse.season.plot.uo <- ggplot(NULL, aes(y=rmse.season.uo, x=c(2005:2019))) + geom_jitter(color = "dodgerblue4") + theme_light() + labs(x = 'Year', y = 'RMSE', title = 'RMSE, UO') + geom_smooth(method = 'lm', se = F, color = "dodgerblue4")
+
+p1.season.plot.uo <- ggplot(NULL, aes(y=p1.season.uo, x=c(2005:2019))) + geom_jitter(color = "dodgerblue4") + theme_light() + labs(x = 'Year', y = 'P1', title = 'P1, UO') + geom_smooth(method = 'lm', se = F, color = "dodgerblue4")
+
+p2.season.plot.uo <- ggplot(NULL, aes(y=p2.season.uo, x=c(2005:2019))) + geom_jitter(color = "dodgerblue4") + theme_light() + labs(x = 'Year', y = 'P2', title = 'P2, UO') + geom_smooth(method = 'lm', se = F, color = "dodgerblue4")
+
+slope.season.plot.uo <- ggplot(NULL, aes(y=slope.season.uo, x=c(2005:2019))) + geom_jitter(color = "dodgerblue4") + theme_light() + labs(x = 'Year', y = 'Slope', title = 'Slope, UO') + geom_smooth(method = 'lm', se = F, color = "dodgerblue4") + geom_abline(slope = 0, intercept = 1, color = "black")
+
+rsqu.season.plot.ah <- ggplot(NULL, aes(y=rsqu.season.ah, x=c(2005:2019))) + geom_jitter(color = "seagreen4") + theme_light() + labs(x = 'Year', y = 'R2', title = 'R2, AH') + geom_smooth(method = 'lm', se = F, color = "seagreen4")
+
+rmse.season.plot.ah <- ggplot(NULL, aes(y=rmse.season.ah, x=c(2005:2019))) + geom_jitter(color = "seagreen4") + theme_light() + labs(x = 'Year', y = 'RMSE', title = 'RMSE, AH') + geom_smooth(method = 'lm', se = F, color = "seagreen4")
+
+p1.season.plot.ah <- ggplot(NULL, aes(y=p1.season.ah, x=c(2005:2019))) + geom_jitter(color = "seagreen4") + theme_light() + labs(x = 'Year', y = 'P1', title = 'P1, AH') + geom_smooth(method = 'lm', se = F, color = "seagreen4")
+
+p2.season.plot.ah <- ggplot(NULL, aes(y=p2.season.ah, x=c(2005:2019))) + geom_jitter(color = "seagreen4") + theme_light() + labs(x = 'Year', y = 'P2', title = 'P2, AH') + geom_smooth(method = 'lm', se = F, color = "seagreen4")
+
+slope.season.plot.ah <- ggplot(NULL, aes(y=slope.season.ah, x=c(2005:2019))) + geom_jitter(color = "seagreen4") + theme_light() + labs(x = 'Year', y = 'Slope', title = 'Slope, AH') + geom_smooth(method = 'lm', se = F, color = "seagreen4") + geom_abline(slope = 0, intercept = 1, color = "black")
+
+seasontimeplot <- grid.arrange(rsqu.season.plot.1x2, rsqu.season.plot.uo, rsqu.season.plot.ah, 
+                               rmse.season.plot.1x2, rmse.season.plot.uo, rmse.season.plot.ah,
+                               p1.season.plot.1x2,   p1.season.plot.uo,   p1.season.plot.ah, 
+                               p2.season.plot.1x2,   p2.season.plot.uo,   p2.season.plot.ah, 
+                               slope.season.plot.1x2, slope.season.plot.uo, slope.season.plot.ah, 
+                               nrow = 5, top = 'English & Scottish Leagues Accuracy Statistics over Time')
+```
+
+## 3.5 The Overround
+
+The overround is a measure of bookmaker commission, found by taking the sum of the underlying probabilities (inverse odds). For example, an overround of 1.05 would indicate a 5% commission for that match. In this section, we will create plots comparing the overround in each market, at the by-level and by-season levels.
+
+
+```{r overroundplots}
+or.ot.l <- ggplot(ensco, aes(x=AvgHProb, y=OneXTwoOverround, color = Level)) + geom_jitter(alpha = 0.5) + theme_light() + guides(col = guide_legend(ncol = 3)) + labs(x = "Consensus P(Home Win)", y = "Sum of Probabilities (1X2)", title = "Consensus P(Home Win) v. Bookmaker Commission, by Level", caption = "English/Scottish Leagues, 2005-20") + coord_cartesian(ylim = c(1, 1.3))
+
+or.ot.s <- ggplot(ensco, aes(x=AvgHProb, y=OneXTwoOverround, color = Season)) + geom_jitter(alpha = 0.5) + theme_light() + guides(col = guide_legend(ncol = 3)) + labs(x = "Consensus P(Home Win)", y = "Sum of Probabilities (1X2)", title = "Consensus P(Home Win) v. Bookmaker Commission, by Season", caption = "English/Scottish Leagues, 2005-20") + coord_cartesian(ylim = c(1, 1.3))
+
+or.uo.l <- ggplot(ensco,aes(x=Over2.5Prob,y=UnderOverOverround,color=Level)) + geom_jitter(alpha = 0.5) + theme_light() + guides(col = guide_legend(ncol = 3)) + labs(x = "Consensus P(Over 2.5 Goals)", y="Sum of Probabilities (UO)", title = "Consensus P(Over 2.5 Goals) v. Bookmaker Commission, by Level", caption = "English/Scottish Leagues, 2005-20") + coord_cartesian(ylim = c(1, 1.3))
+
+or.uo.s <- ggplot(ensco,aes(x=Over2.5Prob,y=UnderOverOverround,color=Season)) + geom_jitter(alpha = 0.5) + theme_light() + guides(col = guide_legend(ncol = 3)) + labs(x = "Consensus P(Over 2.5 Goals)", y="Sum of Probabilities (UO)", title = "Consensus P(Over 2.5 Goals) v. Bookmaker Commission, by Season", caption = "English/Scottish Leagues, 2005-20") + coord_cartesian(ylim = c(1, 1.3))
+
+or.ah.l <- ggplot(ensco, aes(x=AH.HProb, y=AHOverround, color = Level)) + geom_jitter(alpha = 0.5) + theme_light() + guides(col = guide_legend(ncol = 3)) + labs(x = "Consensus P(AH Home Win)", y = "Sum of Probabilities (AH)", title = "Consensus P(Home Win, AH) v. Bookmaker Commission, by Level", caption = "English/Scottish Leagues, 2005-20") + coord_cartesian(ylim = c(1, 1.3))
+
+or.ah.s <- ggplot(ensco, aes(x=AH.HProb, y=AHOverround, color = Season)) + geom_jitter(alpha = 0.5) + theme_light() + guides(col = guide_legend(ncol = 3)) + labs(x = "Consensus P(AH Home Win)", y = "Sum of Probabilities (AH)", title = "Consensus P(Home Win, AH) v. Bookmaker Commission, by Season", caption = "English/Scottish Leagues, 2005-20") + coord_cartesian(ylim = c(1, 1.3))
+
+grid.arrange(or.ot.l, or.uo.l, or.ah.l,
+             nrow = 1, top = 'Overround Plots By-Level')
+
+grid.arrange(or.ot.s, or.uo.s, or.ah.s,
+             nrow = 1, top = 'Overround Plots By-Season')
+
+mean(ensco$OneXTwoOverround)
+mean(ensco$UnderOverOverround)
+mean(ensco$AHOverround)
+
+#By Level
+for (i in levels){
+  print(paste("Level",i,"---------------------------------------------")) 
+  print(paste("1X2 Overround: ",mean(ensco[ensco$Level==i,]$OneXTwoOverround)))
+  print(paste("UO Overround: ",mean(ensco[ensco$Level==i,]$UnderOverOverround)))
+  print(paste("AH Overround: ",mean(ensco[ensco$Level==i,]$AHOverround)))
+}
+#Select seasons (05/06, 12/13 and 19/20) (equally spaced)
+for (j in c("0506", "1213", "1920")){
+  print(paste("Season",j,"--------------------------------------------")) 
+  print(paste("1X2 Overround: ",mean(ensco[ensco$Season==j,]$OneXTwoOverround)))
+  print(paste("UO Overround: ",mean(ensco[ensco$Season==j,]$UnderOverOverround)))
+  print(paste("AH Overround: ",mean(ensco[ensco$Season==j,]$AHOverround)))
+}
+```  
+
+The overround is reduced at higher levels, across all three markets: this is most evident in the 1X2 market (where the mean Level 3 overround is 2.54% higher than Level 1), and is least evident in the Asian Handicap market (0.16%). Over time, the overround has been reducing the 1X2 and Under/Over 2.5 Goals markets, but remaining stable in the Asian Handicap: the largest change in the AH market is the variance of the consensus probability (and thus, odds offered), which have been reducing over time.
+
+## 3.6 Conclusion
+
+It has been found that across the English & Scottish football league pyramids, bookmakers are most accurate in the 1X2 market (excluding performance on Draws), followed by the Asian Handicap market, with poor accuracy in the Under/Over 2.5 Goals market, however, the bookmaker accuracy is in fact decreasing in the AH market, and increasing in the UO market. 1X2 odds are, surprisingly, more accurate in Level 3&mdash;the lower leagues involving semi-professional sides&mdash;than in Level 2&mdash;wholly professional lower leagues; performance in Level 1 was greater than all other levels. Finally, in Section 3.5, it has shown the bookmaker commission is highest in the 1X2 market, highest in lower levels, and is reducing over time.
+
+# 4 A Proposed Algorithm
+
+In this section, we use our findings to create an algorithm, aiming to create profit. First, however, we must re-read the data into one large dataset, and load two new libraries.
+
+```{r}
+library(scales); library(e1071)
+
+matchesTemp <- NULL; matches <- NULL
+seasons <- c("0506", "0607", "0708", "0809", "0910", "1011", "1112", "1213", "1314", "1415", "1516", "1617", "1718", "1819", "1920")
+divisions <- c("E0", "E1", "E2", "E3", "EC", "SC0", "SC1", "SC2", "SC3", "D1", "SP1", "F1", "I1", "P1")
+
+for (i in seasons){
+  for (j in divisions){
+    matchesTemp <- read.csv(paste0("https://www.football-data.co.uk/mmz4281/", i, "/", j, ".csv"), fileEncoding="latin1")
+    #The above line will download and read the .csv file in one go. 
+    matchesTemp$Season <- with(matchesTemp,i)
+    matchesTemp$Div <- with(matchesTemp, j)
+    if (i=="1920"){
+      matchesTemp$BbAvH <- matchesTemp$AvgH
+      matchesTemp$BbAvA <- matchesTemp$AvgA
+      matchesTemp$BbAvD <- matchesTemp$AvgD
+      matchesTemp$BbAvAHH <- matchesTemp$AvgAHH
+      matchesTemp$BbAvAHA <- matchesTemp$AvgAHA
+      matchesTemp$BbAHh <- matchesTemp$AHh}
+    else{}
+    matchesTemp$HomeHandicap <- matchesTemp$BbAHh
+    matchesTemp <- matchesTemp[,c("Div", "Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR", "BbAvH", "BbAvD", "BbAvA", "HomeHandicap", "BbAvAHH", "BbAvAHA", "Season")]
+    matches <- rbind(matches, matchesTemp)
+  }
+}
+matches <- na.omit(matches)
+
+# Finding underlying probabilities of each event:-
+matches$OT.HProb.PN <- with(matches, 1/(BbAvH))
+matches$OT.DProb.PN <- with(matches, 1/(BbAvD))
+matches$OT.AProb.PN <- with(matches, 1/(BbAvA))
+matches$AH.HProb.PN <- with(matches, 1/(BbAvAHH))
+matches$AH.AProb.PN <- with(matches, 1/(BbAvAHA))
+
+# Finding consensus probabilities of each event:-
+matches$OT.HProb <- with(matches, round(OT.HProb.PN / (OT.HProb.PN + OT.DProb.PN + OT.AProb.PN), 4))
+matches$OT.AProb <- with(matches, round(OT.AProb.PN / (OT.HProb.PN + OT.DProb.PN + OT.AProb.PN), 4))
+matches$AH.HProb <- with(matches,round(AH.HProb.PN / (AH.HProb.PN + AH.AProb.PN), 4))
+matches$AH.AProb <- with(matches,round(AH.AProb.PN / (AH.HProb.PN + AH.AProb.PN), 4))
+
+N = nrow(matches)
+
+matches$FTHG.ah <- with(matches, rep(0,N))
+for (m in 1:N){matches$FTHG.ah[m] <- matches$FTHG[m] + matches$HomeHandicap[m]}
+matches$ah.gap <- with(matches, FTHG.ah - FTAG); matches$ah.res <- NULL
+for (n in 1:N){
+  if (matches$ah.gap[n]<(-0.25)){matches$ah.res[n] <- "aw"}
+  else if (matches$ah.gap[n]==(-0.25)){matches$ah.res[n] <- "hfaw"}
+  else if (matches$ah.gap[n]==0){matches$ah.res[n] <- "vo"}
+  else if (matches$ah.gap[n]==0.25){matches$ah.res[n] <- "hfhm"}
+  else if (matches$ah.gap[n]>0.25){matches$ah.res[n] <- "hm"}
+  else{}
+}
+```
+
+## 4.1 The Algorithm
+
+We choose to place our bets in four markets: the Home Win and Away Win outcomes of the 1X2 and Asian Handicap markets. For a match, we place a bet on a certain outcome:
+
+* if the consensus probability is greater than or equal to 0.5 standard deviations, but less than one standard deviations above the mean, we place a bet of <b>one unit</b>;
+* if the consensus probability is greater than or equal to one standard deviations, but less than 1.5 standard deviations above the mean, we place a bet of <b>two units</b>;
+* and if the consensus probability is greater than or equal to 1.5 standard deviations above the mean, we place a bet of <b>three units</b>, else we don't bet.  
+
+This allows us to place bets in different markets despite differing variability: each market is bet on based on the market means and standard deviations. We choose to use the 2005/06 season (the first in our dataset) as an information gathering season, where no bets are placed. After each game, we update the mean and standard deviations of each market.
+
+```{r placingbets}
+matches$OTHomeBet <- with(matches, 0); matches$OTAwayBet <- with(matches, 0)
+matches$AHHomeBet <- with(matches, 0); matches$AHAwayBet <- with(matches, 0)
+
+#Initial Means and Standard Deviations :-
+matches0506 <- matches[matches$Season == '0506',]
+mu.oth <- mean(matches0506$OT.HProb); sd.oth <- sd(matches0506$OT.HProb)
+mu.ota <- mean(matches0506$OT.AProb); sd.ota <- sd(matches0506$OT.AProb)
+mu.ahh <- mean(matches0506$AH.HProb); sd.ahh <- sd(matches0506$AH.HProb)
+mu.aha <- mean(matches0506$AH.AProb); sd.aha <- sd(matches0506$AH.AProb)
+n <- nrow(matches[matches$Season == "0506",]); N <- nrow(matches)
+
+#Placing Bets:-
+for (i in n:N){
+  #Update the mean and std dev's with our new information
+  mu.oth <- mean(matches$OT.HProb[1:i]); sd.oth <- sd(matches$OT.HProb[1:i])
+  mu.ota <- mean(matches$OT.AProb[1:i]); sd.ota <- sd(matches$OT.AProb[1:i])
+  mu.ahh <- mean(matches$AH.HProb[1:i]); sd.ahh <- sd(matches$AH.HProb[1:i])
+  mu.aha <- mean(matches$AH.AProb[1:i]); sd.aha <- sd(matches$AH.AProb[1:i])
+  #Do we bet on Home Win (1X2)?
+  if (matches$OT.HProb[i] > mu.oth + 0.5*sd.oth){
+    if (matches$OT.HProb[i] <= mu.oth + sd.oth){matches$OTHomeBet[i] <- 1}
+    else if (matches$OT.HProb[i] > mu.oth + sd.oth & matches$OT.HProb[i] <= mu.oth + 1.5*sd.oth){matches$OTHomeBet[i] <- 2}
+    else {matches$OTHomeBet[i] <- 3}}
+  else {matches$OTHomeBet[i] <- 0}
+  #Do we bet on Away Win (1X2)?
+  if (matches$OT.AProb[i] > mu.ota + 0.5*sd.ota){
+    if (matches$OT.AProb[i] <= mu.ota + sd.ota){matches$OTAwayBet[i] <- 1}
+    else if (matches$OT.AProb[i] > mu.ota + sd.ota & matches$OT.AProb[i] <= mu.ota + 1.5*sd.ota){matches$OTAwayBet[i] <- 2}
+    else {matches$OTAwayBet[i] <- 3}}
+  else {matches$OTAwayBet[i] <- 0}
+  #Do we bet on Home Win (AH)?
+  if (matches$AH.HProb[i] > mu.ahh + 0.5*sd.ahh){
+    if (matches$AH.HProb[i] <= mu.ahh + sd.ahh){matches$AHHomeBet[i] <- 1}
+    else if (matches$AH.HProb[i] > mu.ahh + sd.ahh & matches$AH.HProb[i] <= mu.ahh + 1.5*sd.ahh){matches$AHHomeBet[i] <- 2}
+    else {matches$AHHomeBet[i] <- 3}}
+  else {matches$AHHomeBet[i] <- 0}
+  #Do we bet on Away Win (AH)?
+  if (matches$AH.AProb[i] > mu.aha + 0.5*sd.aha){
+    if (matches$AH.AProb[i] <= mu.aha + sd.aha){matches$AHAwayBet[i] <- 1}
+    else if (matches$AH.AProb[i] > mu.aha + sd.aha & matches$AH.AProb[i] <= mu.aha + 1.5*sd.aha){matches$AHAwayBet[i] <- 2}
+    else {matches$AHAwayBet[i] <- 3}}
+  else {matches$AHAwayBet[i] <- 0}
+}
+```
+
+## 4.2 Computing the Winnings
+
+How did our algorithm do? We use the following code to a) find our winning bets and b) plot a graph of our cumulative returns, both overall and for the first 100 matches.
+
+```{r winnings}
+
+matches$OTHReturns <- with(matches, 0); matches$OTAReturns <- with(matches, 0)
+matches$AHHReturns <- with(matches, 0); matches$AHAReturns <- with(matches, 0)
+
+for (i in n:N){
+  if (matches$FTR[i]=="H"){
+    matches$OTHReturns[i] <- (matches$BbAvH[i] - 1) * matches$OTHomeBet[i]
+    matches$OTAReturns[i] <- -matches$OTAwayBet[i]}
+  else if (matches$FTR[i]=="A"){
+    matches$OTAReturns[i] <- (matches$BbAvA[i] - 1) * matches$OTAwayBet[i]
+    matches$OTHReturns[i] <- -matches$OTHomeBet[i]}
+  else {
+    matches$OTHReturns[i] <- -matches$OTHomeBet[i]
+    matches$OTAReturns[i] <- -matches$OTAwayBet[i]}
+}
+
+for (i in n:N){
+  if (matches$ah.res[i]=="aw"){
+    matches$AHAReturns[i] <- (matches$BbAvAHA[i] - 1) * matches$AHAwayBet[i]
+    matches$AHHReturns[i] <- -matches$AHHomeBet[i]
+  }
+  else if (matches$ah.res[i]=="hfaw"){
+    matches$AHAReturns[i] <- (matches$BbAvAHA[i] - 1) * 0.5 * matches$AHAwayBet[i] - 0.5 * matches$AHAwayBet[i]
+    matches$AHHReturns[i] <- -matches$AHHomeBet[i]
+  }
+  else if (matches$ah.res[i]=="hm"){
+    matches$AHHReturns[i] <- (matches$BbAvAHH[i] - 1) * matches$AHHomeBet[i]
+    matches$AHAReturns[i] <- -matches$AHAwayBet[i]
+  }
+  else if (matches$ah.res[i]=="hfhm"){
+    matches$AHHReturns[i] <- (matches$BbAvAHH[i] - 1) * 0.5 * matches$AHHomeBet[i] - 0.5 * matches$AHHomeBet[i]
+    matches$AHAReturns[i] <- -matches$AHAwayBet[i]
+  }
+  else{ #i.e. Void
+    matches$AHHReturns[i] <- 0
+    matches$AHAReturns[i] <- 0
+  }
+}
+
+#Cumulative Returns (for our plot):-
+matches$C.OTHReturns <- with(matches, 0); matches$C.OTAReturns <- with(matches, 0)
+matches$C.AHHReturns <- with(matches, 0); matches$C.AHAReturns <- with(matches, 0)
+matches$C.Returns <- with(matches, 0)
+
+matches$C.OTHReturns[1] <- matches$OTHReturns[1]; matches$C.OTAReturns[1] <- matches$OTAReturns[1]
+matches$C.AHHReturns[1] <- matches$AHHReturns[1]; matches$C.AHAReturns[1] <- matches$AHAReturns[1]
+matches$C.Returns[1] <- matches$OTHReturns[1] + matches$OTAReturns[1] + matches$AHHReturns[1] + matches$AHAReturns[1]
+
+for (i in 2:N){matches$C.Returns[i] <- matches$C.Returns[i-1] + matches$OTHReturns[i] + matches$OTAReturns[i] + matches$AHHReturns[i] + matches$AHAReturns[i]}
+for (i in 2:N){matches$C.OTHReturns[i] <- matches$C.OTHReturns[i-1] + matches$OTHReturns[i]}
+for (i in 2:N){matches$C.OTAReturns[i] <- matches$C.OTAReturns[i-1] + matches$OTAReturns[i]}
+for (i in 2:N){matches$C.AHHReturns[i] <- matches$C.AHHReturns[i-1] + matches$AHHReturns[i]}
+for (i in 2:N){matches$C.AHAReturns[i] <- matches$C.AHAReturns[i-1] + matches$AHAReturns[i]}
+
+matches$BetIndex <- with(matches,0)
+for (i in n:N){matches$BetIndex[i] <- (i-(n-1))}
+
+## PLOTS ----
+cr1 <- ggplot(matches,aes(x=BetIndex,y=C.OTHReturns,color="1X2 H Returns")) + 
+  geom_line() +
+  geom_line(aes(x=BetIndex, y=C.OTAReturns, color="1X2 A Returns")) +
+  geom_line(aes(x=BetIndex, y=C.AHHReturns, color="AH H Returns")) +
+  geom_line(aes(x=BetIndex, y=C.AHAReturns, color="AH A Returns")) +
+  #geom_line(aes(x=BetIndex, y=C.Returns, color="Total Returns"), linetype="dotted") +
+  theme_light() + labs(title="Cumulative Winnings using our Algorithm", caption="All matches, 2006-20", x="Match Index", y="Returns (unit)") +
+  scale_color_manual(name="Bet Type", values=c("1X2 H Returns" = "blue", "1X2 A Returns" = "coral", "AH H Returns" = "green", "AH A Returns" = "purple", "Total Returns" = "black")) + geom_hline(yintercept=0, color="black", linetype="dotted", alpha=.5)
+
+cr2 <- ggplot(matches, aes(x=BetIndex, y=C.OTHReturns, color="1X2 H Returns")) + 
+  geom_line() +
+  geom_line(aes(x=BetIndex, y=C.OTAReturns, color="1X2 A Returns")) +
+  geom_line(aes(x=BetIndex, y=C.AHHReturns, color="AH H Returns")) +
+  geom_line(aes(x=BetIndex, y=C.AHAReturns, color="AH A Returns")) +
+  geom_line(aes(x=BetIndex, y=C.Returns, color="Total Returns"), linetype="twodash") +
+  scale_color_manual(name="Bet Type", values=c("1X2 H Returns" = "blue", "1X2 A Returns" = "coral", "AH H Returns" = "green", "AH A Returns" = "purple", "Total Returns" = "black")) +
+  theme_light() + coord_cartesian(xlim=c(0, 100), ylim=c(-25,25)) + geom_hline(yintercept=0, color="black", linetype="dotted", alpha=.5) + labs(title="Cumulative Winnings (First 100 Games)\n using our Algorithm", caption="All matches from 2006-20", x="Match Index", y="Returns (unit)")
+
+cr1
+cr2
+
+## ACCURACY OF THE ALGORITHM  ----
+n.OTH <- nrow(matches[matches$OTHomeBet > 0,]); n.OTA <- nrow(matches[matches$OTAwayBet > 0,])
+n.AHH <- nrow(matches[matches$AHHomeBet > 0,]); n.AHA <- nrow(matches[matches$AHAwayBet > 0,])
+n.BetsPlaced <- n.OTH + n.OTA + n.AHH + n.AHA
+n.MatchesBet <- nrow(matches[which(matches$OTHomeBet > 0 | matches$OTAwayBet > 0 | matches$AHHomeBet > 0 | matches$AHAwayBet > 0),])
+n.BetsMatrix <- matrix(round(c(n.OTH, n.OTA, n.AHH, n.AHA, n.BetsPlaced), 5), ncol = 5)
+
+accuracy.ot.h <- nrow(matches[matches$OTHReturns > 0,]) / n.OTH * 100
+accuracy.ot.a <- nrow(matches[matches$OTAReturns > 0,]) / n.OTA * 100
+accuracy.ah.h <- nrow(matches[matches$AHHReturns > 0,]) / n.AHH * 100
+accuracy.ah.a <- nrow(matches[matches$AHAReturns > 0,]) / n.AHA * 100
+accuracy.overall <- 100 * (nrow(matches[matches$OTHReturns > 0,]) + nrow(matches[matches$OTAReturns > 0,]) + nrow(matches[matches$AHHReturns > 0,]) + nrow(matches[matches$AHAReturns > 0,])) / n.BetsPlaced
+
+accuracy <- matrix(c(accuracy.ot.h, accuracy.ot.a, accuracy.ah.h, accuracy.ah.a, accuracy.overall), ncol = 5)
+total.winnings <- sum(matches$OTHReturns) + sum(matches$OTAReturns) + sum(matches$AHHReturns) + sum(matches$AHAReturns)
+bet.winnings <- matrix(c(sum(matches$OTHReturns), sum(matches$OTAReturns), sum(matches$AHHReturns), sum(matches$AHAReturns), total.winnings), ncol = 5)
+bet.analysis <- matrix(c(n.BetsMatrix, bet.winnings, accuracy), nrow = 5, byrow = F, dimnames = list(c('1x2 H', '1x2 A', 'AH H', 'AH A', 'Overall'), c('Bets Placed','Winnings', 'Accuracy (%)')))
+
+bet.analysis
+```
+
+## 4.3 Results
+So our algorithm doesn't do too well, losing 4.3% of the 'investment', despite winning over half of the bets placed. To assess this, we compare it with two further methods:
+
+* a) an 'alternate' algorithm&mdash;Based on our one, but without betting on the worst performing leagues from Chapters 2 and 3, which will ignore the German and French leagues, and Level 2 bets;
+* b) a 'random bet strategy'&mdash;Bets randomly placed on matches, with the same distributions (i.e. probability of a bet of a given value) as our method.
+
+## 4.4 Comparisons
+
+### 4.4.1 Alternate Method
+
+We place the bets by simply copying them from before, but removing bets if their division takes a certain value (the leagues we are ignoring). We find the winnings as before: this is hidden, with the output only shown.
+
+```{r message=FALSE, warning=FALSE}
+#First, we copy the bets we placed earlier into new columns:
+matches$OTHomeBet.alt <- with(matches, OTHomeBet); matches$OTAwayBet.alt <- with(matches, OTAwayBet)
+matches$AHHomeBet.alt <- with(matches, AHHomeBet); matches$AHAwayBet.alt <- with(matches, AHAwayBet)
+
+#Removing bets placed in France, Germany and Level 2, Eng/Sco:-
+for (i in 1:N){
+  if (matches$Div[i] %in% c("D1", "F1", "E2", "E3", "SC1")){
+    matches$OTHomeBet.alt[i] <- 0; matches$OTAwayBet.alt[i] <- 0
+    matches$AHHomeBet.alt[i] <- 0; matches$AHAwayBet.alt[i] <- 0
+  }
+}
+#And the same with returns
+matches$OTHRet.alt <- with(matches, OTHReturns); matches$OTARet.alt <- with(matches, OTAReturns)
+matches$AHHRet.alt <- with(matches, AHHReturns); matches$AHARet.alt <- with(matches, AHAReturns)
+for (i in 1:N){
+  if (matches$Div[i] %in% c("D1", "F1", "E2", "E3", "SC1")){
+    matches$OTHRet.alt[i] <- 0; matches$OTARet.alt[i] <- 0
+    matches$AHHRet.alt[i] <- 0; matches$AHARet.alt[i] <- 0
+  }
+}
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+matches$C.OTHRet.alt <- with(matches,0); matches$C.OTARet.alt <- with(matches,0); matches$C.AHHRet.alt <- with(matches,0); matches$C.AHARet.alt <- with(matches,0); matches$C.Returns.alt <- with(matches, 0)
+
+matches$C.OTHRet.alt[1] <- matches$OTHRet.alt[1]
+matches$C.OTARet.alt[1] <- matches$OTARet.alt[1]
+matches$C.AHHRet.alt[1] <- matches$AHHRet.alt[1]
+matches$C.AHARet.alt[1] <- matches$AHARet.alt[1]
+matches$C.Returns.alt[1] <- matches$OTHRet.alt[1] + matches$OTARet.alt[1] + matches$AHHRet.alt[1] + matches$AHARet.alt[1]
+
+for (i in 2:N){matches$C.Returns.alt[i] <- matches$C.Returns.alt[i-1] + matches$OTHRet.alt[i] + matches$OTARet.alt[i] + matches$AHHRet.alt[i] + matches$AHARet.alt[i]}
+for (i in 2:N){matches$C.OTHRet.alt[i] <- matches$C.OTHRet.alt[i-1] + matches$OTHRet.alt[i]}
+for (i in 2:N){matches$C.OTARet.alt[i] <- matches$C.OTARet.alt[i-1] + matches$OTARet.alt[i]}
+for (i in 2:N){matches$C.AHHRet.alt[i] <- matches$C.AHHRet.alt[i-1] + matches$AHHRet.alt[i]}
+for (i in 2:N){matches$C.AHARet.alt[i] <- matches$C.AHARet.alt[i-1] + matches$AHARet.alt[i]}
+
+#Accuracy
+n.OTH.alt <- nrow(matches[matches$OTHomeBet.alt > 0,])
+n.OTA.alt <- nrow(matches[matches$OTAwayBet.alt > 0,])
+n.AHH.alt <- nrow(matches[matches$AHHomeBet.alt > 0,])
+n.AHA.alt <- nrow(matches[matches$AHAwayBet.alt > 0,])
+n.BetsP.alt <- n.OTH.alt + n.OTA.alt + n.AHH.alt + n.AHA.alt
+n.BetsMatrix.alt <- matrix(round(c(n.OTH.alt, n.OTA.alt, n.AHH.alt, n.AHA.alt, n.BetsP.alt), 5), ncol = 5)
+
+accalt.ot.h <- nrow(matches[matches$OTHRet.alt > 0,]) / n.OTH.alt * 100
+accalt.ot.a <- nrow(matches[matches$OTARet.alt > 0,]) / n.OTA.alt * 100
+accalt.ah.h <- nrow(matches[matches$AHHRet.alt > 0,]) / n.AHH.alt * 100
+accalt.ah.a <- nrow(matches[matches$AHARet.alt > 0,]) / n.AHA.alt * 100
+
+accalt.ovr <- 100 * (nrow(matches[matches$OTHRet.alt > 0,]) + nrow(matches[matches$OTARet.alt > 0,]) + nrow(matches[matches$AHHRet.alt > 0,]) + nrow(matches[matches$AHARet.alt > 0,])) / n.BetsP.alt
+accalt <- matrix(c(accalt.ot.h, accalt.ot.a, accalt.ah.h, accalt.ah.a, accalt.ovr), ncol = 5)
+total.wins.alt <- sum(matches$OTHRet.alt) + sum(matches$OTARet.alt) + sum(matches$AHHRet.alt) + sum(matches$AHARet.alt)
+bet.wins.alt <- matrix(c(sum(matches$OTHRet.alt), sum(matches$OTARet.alt), sum(matches$AHHRet.alt), sum(matches$AHARet.alt), total.wins.alt), ncol = 5)
+bet.analysis.alt <- matrix(c(n.BetsMatrix.alt, bet.wins.alt, accalt), nrow = 5, byrow = F, dimnames = list(c('1x2 H', '1x2 A', 'AH H', 'AH A', 'Overall'), c('Bets Placed','Winnings', 'Accuracy (%)')))
+
+bet.analysis.alt
+```
+
+Whilst the overall accuracy is improved, removing these leagues doesn't make a large difference overall, improving our winnings by 0.4%.
+
+### 4.4.2 Random Bet Strategy
+
+We can choose to run the RBS any number of times to give output tables; in the actual project, I ran it 10 times. To save space here, I will run it once.
+
+```{r}
+nRunRBS <- 1
+
+N <- nrow(matches)
+for (i in 1:nRunRBS){
+  #Reset probabilities for 1X2 Home
+  p1 <- nrow(matches[matches$OTHomeBet == 1,]) / nrow(matches[(n+1):N,])
+  p2 <- nrow(matches[matches$OTHomeBet == 2,]) / nrow(matches[(n+1):N,])
+  p3 <- nrow(matches[matches$OTHomeBet == 3,]) / nrow(matches[(n+1):N,])
+  p0 <- 1 - (p1 + p2 + p3)
+  
+  #Reset bets and returns
+  matches$rand.Bet.OTH <- with(matches, 0); matches$rand.Ret.OTH <- with(matches, 0)
+  #Randomly place the bets using the rdiscrete function
+  matches$rand.Bet.OTH <- with(matches, rand.Bet.OTH + rdiscrete(n = nrow(matches), values = 0:3, probs=c(p0, p1, p2, p3)))
+  
+  for(i in n:N){
+    if (matches$FTR[i] == "H"){matches$rand.Ret.OTH[i] <- (matches$BbAvH[i]-1) * matches$rand.Bet.OTH[i]}
+    else{matches$rand.Ret.OTH[i] <- -matches$rand.Bet.OTH[i]}}
+  
+  #Reset probabilities for 1X2 Away
+  p1 <- nrow(matches[matches$OTAwayBet == 1,]) / nrow(matches[(n+1):N,])
+  p2 <- nrow(matches[matches$OTAwayBet == 2,]) / nrow(matches[(n+1):N,])
+  p3 <- nrow(matches[matches$OTAwayBet == 3,]) / nrow(matches[(n+1):N,])
+  p0 <- 1 - (p1 + p2 + p3)
+  
+  matches$rand.Bet.OTA <- with(matches, 0); matches$rand.Ret.OTA <- with(matches, 0)
+  matches$rand.Bet.OTA <- with(matches, rand.Bet.OTA + rdiscrete(n = nrow(matches), values = 0:3, probs=c(p0, p1, p2, p3)))
+  
+  for (i in n:N){
+    if (matches$FTR[i] == "A"){matches$rand.Ret.OTA[i] <- (matches$BbAvA[i]-1) * matches$rand.Bet.OTA[i]}
+    else{matches$rand.Ret.OTA[i] <- -matches$rand.Bet.OTA[i]}}
+  
+  #Reset probabilities for AH Home
+  p1 <- nrow(matches[matches$AHHomeBet == 1,]) / nrow(matches[(n+1):N,])
+  p2 <- nrow(matches[matches$AHHomeBet == 2,]) / nrow(matches[(n+1):N,])
+  p3 <- nrow(matches[matches$AHHomeBet == 3,]) / nrow(matches[(n+1):N,])
+  p0 <- 1 - (p1 + p2 + p3)
+  
+  matches$rand.Bet.AHH <- with(matches, 0); matches$rand.Ret.AHH <- with(matches, 0)
+  matches$rand.Bet.AHH <- with(matches, rand.Bet.AHH + rdiscrete(n = nrow(matches), values = 0:3, probs=c(p0, p1, p2, p3)))
+  for (i in n:N){
+    if (matches$ah.res[i] == "hm"){matches$rand.Ret.AHH[i] <- (matches$BbAvAHH[i]-1) * matches$rand.Bet.AHH[i]}
+    else if (matches$ah.res[i] == "hfhm"){matches$rand.Ret.AHH[i] <- (matches$BbAvAHH[i]-1) * 0.5 * matches$rand.Bet.AHH[i] - (0.5 * matches$rand.Bet.AHH[i])}
+    else{matches$rand.Ret.AHH[i] <- -matches$rand.Bet.AHH[i]}}
+  
+  #Reset probabilities for AH Away
+  p1 <- nrow(matches[matches$AHAwayBet == 1,]) / nrow(matches[(n+1):N,])
+  p2 <- nrow(matches[matches$AHAwayBet == 2,]) / nrow(matches[(n+1):N,])
+  p3 <- nrow(matches[matches$AHAwayBet == 3,]) / nrow(matches[(n+1):N,])
+  p0 <- 1 - (p1 + p2 + p3)
+  
+  matches$rand.Bet.AHA <- with(matches, 0); matches$rand.Ret.AHA <- with(matches, 0)
+  matches$rand.Bet.AHA <- with(matches, rand.Bet.AHA + rdiscrete(n = nrow(matches), values = 0:3, probs=c(p0, p1, p2, p3)))
+  for (i in n:N){
+    if (matches$ah.res[i] == "aw"){matches$rand.Ret.AHA[i] <- (matches$BbAvAHA[i]-1) * matches$rand.Bet.AHA[i]}
+    else if (matches$ah.res[i] == "hfaw"){matches$rand.Ret.AHA[i] <- (matches$BbAvAHA[i]-1) * 0.5 * matches$rand.Bet.AHA[i] - (0.5 * matches$rand.Bet.AHA[i])}
+    else{matches$rand.Ret.AHA[i] <- -matches$rand.Bet.AHA[i]}}
+  
+  #Creating our analysis matrix:
+  #No. of bets
+  #We add the caveat of BetIndex > 0 to avoid betting on the 05/06 season
+  n.Ran.OTH <- nrow(matches[matches$rand.Bet.OTH > 0 & matches$BetIndex > 0,])
+  n.Ran.OTA <- nrow(matches[matches$rand.Bet.OTA > 0 & matches$BetIndex > 0,])
+  n.Ran.AHH <- nrow(matches[matches$rand.Bet.AHH > 0 & matches$BetIndex > 0,])
+  n.Ran.AHA <- nrow(matches[matches$rand.Bet.AHA > 0 & matches$BetIndex > 0,])
+  n.RanBets <- n.Ran.OTH + n.Ran.OTA + n.Ran.AHH + n.Ran.AHA
+  n.RanMatx <- matrix(c(n.Ran.OTH, n.Ran.OTA, n.Ran.AHH, n.Ran.AHA, n.RanBets), ncol = 5)
+  
+  stake.OTH <- sum(matches$rand.Bet.OTH); stake.OTA <- sum(matches$rand.Bet.OTA)
+  stake.AHH <- sum(matches$rand.Bet.AHH); stake.AHA <- sum(matches$rand.Bet.AHA)
+  stake.ovr <- stake.OTH + stake.OTA + stake.AHH + stake.AHA
+  stakeMatx <- matrix(c(stake.OTH, stake.OTA, stake.AHH, stake.AHA, stake.ovr), ncol = 5)
+  
+  #Accuracy percentage
+  acc.Ran.OTH <- nrow(matches[matches$rand.Ret.OTH > 0,]) / n.Ran.OTH * 100
+  acc.Ran.OTA <- nrow(matches[matches$rand.Ret.OTA > 0,]) / n.Ran.OTA * 100
+  acc.Ran.AHH <- nrow(matches[matches$rand.Ret.AHH > 0,]) / n.Ran.AHH * 100
+  acc.Ran.AHA <- nrow(matches[matches$rand.Ret.AHA > 0,]) / n.Ran.AHA * 100
+  acc.Ran.ovr <- 100 * (nrow(matches[matches$rand.Ret.OTH > 0,]) + nrow(matches[matches$rand.Ret.OTA > 0,]) + nrow(matches[matches$rand.Ret.AHH > 0,]) + nrow(matches[matches$rand.Ret.AHA > 0,])) / n.RanBets
+  acc.Ran <- matrix(c(acc.Ran.OTH, acc.Ran.OTA, acc.Ran.AHH, acc.Ran.AHA, acc.Ran.ovr), ncol = 5)
+  
+  #Winnings
+  ran.winnings <- sum(matches$rand.Ret.OTH) + sum(matches$rand.Ret.OTA) + sum(matches$rand.Ret.AHH) + sum(matches$rand.Ret.AHA)
+  ran.winningsMtx <- matrix(c(sum(matches$rand.Ret.OTH), sum(matches$rand.Ret.OTA), sum(matches$rand.Ret.AHH), sum(matches$rand.Ret.AHA), ran.winnings), ncol = 5)
+  
+  bet.analysis.random <- matrix(c(n.RanMatx, stakeMatx, ran.winningsMtx, acc.Ran), nrow = 5, byrow = F, dimnames = list(c('1x2 H', '1x2 A', 'AH H', 'AH A', 'Overall'), c('Bets Placed', 'Stake', 'Winnings', 'Accuracy (%)')))
+  print(bet.analysis.random)
+}
+```
+
+And finally, we can plot the RBS, with comparisons against the two previous algorithms. Note that in the dissertation, I run this thirty times when creating the plot, but this takes a long time to conduct. Instead, it is ran only five times here. Each market is ran independently, too.
+
+```{r}
+#Run par(mfrow=c(2,2)) if you want all four plots in one graph. Else, it is recommended to run each plot separately.
+par(mfrow = c(2,2)); nRuns <- 5; alpha0 <- 1/nRuns
+#nRuns is the No. runs you wish to have. More = slower.
+
+#1X2 Home
+plot(matches$BetIndex, matches$C.OTHReturns, col = alpha("red"), type = 'l', ylim = c(-3000, 10), xlab = 'Index', ylab = 'Returns', main = '1X2 Home Win')
+for (i in 1:nRuns){
+  #Reset the random bet, 1X2 Home
+  p1 <- nrow(matches[matches$OTHomeBet == 1,]) / nrow(matches[(n+1):N,])
+  p2 <- nrow(matches[matches$OTHomeBet == 2,]) / nrow(matches[(n+1):N,])
+  p3 <- nrow(matches[matches$OTHomeBet == 3,]) / nrow(matches[(n+1):N,])
+  p0 <- 1 - (p1 + p2 + p3)
+  
+  matches$rand.Bet.OTH <- with(matches, 0)
+  matches$rand.Ret.OTH <- with(matches, 0)
+  matches$rand.Bet.OTH <- with(matches, rand.Bet.OTH + rdiscrete(n = nrow(matches), values = 0:3, probs=c(p0, p1, p2, p3)))
+  
+  #For the random bets, we have 'placed bets' on the 05/06 season, we will ignore it for the plots 
+  for(i in n:N){
+    if (matches$FTR[i] == "H"){matches$rand.Ret.OTH[i] <- (matches$BbAvH[i]-1) * matches$rand.Bet.OTH[i]}
+      else{matches$rand.Ret.OTH[i] <- -matches$rand.Bet.OTH[i]}}
+  
+  matches$rand.CumR.OTH <- with(matches, 0)
+  matches$rand.CumR.OTH[n] <- matches$rand.Ret.OTH[n]
+  for (i in n:N){matches$rand.CumR.OTH[i] <- matches$rand.CumR.OTH[i-1] + matches$rand.Ret.OTH[i]}
+  
+  lines(matches$BetIndex, matches$rand.CumR.OTH, col = alpha("blue", alpha0), type = 'l')
+}
+
+lines(matches$BetIndex, matches$C.OTHReturns, col = alpha("red"), type = 'l')
+lines(matches$BetIndex, matches$C.OTHRet.alt, col = alpha("green"), type = 'l')
+legend(0, -2500, c('Our Method', 'Alternate', 'Random'), lty=c(1,1,1), col=c('red', 'green', 'blue'))
+
+#1X2 Away
+plot(matches$BetIndex, matches$C.OTAReturns, col = alpha("red"), type = 'l', ylim = c(-3000, 10), xlab = 'Index', ylab = 'Returns', main = '1X2 Away Win')
+for (i in 1:nRuns){
+  p1 <- nrow(matches[matches$OTAwayBet == 1,]) / nrow(matches[(n+1):N,])
+  p2 <- nrow(matches[matches$OTAwayBet == 2,]) / nrow(matches[(n+1):N,])
+  p3 <- nrow(matches[matches$OTAwayBet == 3,]) / nrow(matches[(n+1):N,])
+  p0 <- 1 - (p1 + p2 + p3)
+  
+  #Reset the random bet, 1X2 Away
+  matches$rand.Bet.OTA <- with(matches, 0)
+  matches$rand.Ret.OTA <- with(matches, 0)
+  matches$rand.Bet.OTA <- with(matches, rand.Bet.OTA + rdiscrete(n = nrow(matches), values = 0:3, probs=c(p0, p1, p2, p3)))
+  
+  for (i in n:N){
+    if (matches$FTR[i] == "A"){matches$rand.Ret.OTA[i] <- (matches$BbAvA[i]-1) * matches$rand.Bet.OTA[i]}
+    else{matches$rand.Ret.OTA[i] <- -matches$rand.Bet.OTA[i]}}
+  
+  matches$rand.CumR.OTA <- with(matches, 0)
+  matches$rand.CumR.OTA[n] <- matches$rand.Ret.OTA[n]
+  for (i in n:N){matches$rand.CumR.OTA[i] <- matches$rand.CumR.OTA[i-1] + matches$rand.Ret.OTA[i]}
+  
+  lines(matches$BetIndex, matches$rand.CumR.OTA, col=alpha("blue", alpha0), type='l')
+}
+
+lines(matches$BetIndex, matches$C.OTAReturns, col = alpha("red"), type = 'l')
+lines(matches$BetIndex, matches$C.OTARet.alt, col = alpha("green"), type = 'l')
+legend(0, -2500, c('Our Method', 'Alternate', 'Random'), lty=c(1,1,1), col=c('red', 'green', 'blue'))
+
+#AH Home
+plot(matches$BetIndex, matches$C.AHHReturns, col = alpha("red"), type = 'l', ylim = c(-3000, 10), xlab = 'Index', ylab = 'Returns', main = 'AH Home Win')
+for (i in 1:nRuns){
+  p1 <- nrow(matches[matches$AHHomeBet == 1,]) / nrow(matches[(n+1):N,])
+  p2 <- nrow(matches[matches$AHHomeBet == 2,]) / nrow(matches[(n+1):N,])
+  p3 <- nrow(matches[matches$AHHomeBet == 3,]) / nrow(matches[(n+1):N,])
+  p0 <- 1 - (p1 + p2 + p3)
+  
+  #Reset the random bet, AH Home
+  matches$rand.Bet.AHH <- with(matches, 0)
+  matches$rand.Ret.AHH <- with(matches, 0)
+  matches$rand.Bet.AHH <- with(matches, rand.Bet.AHH + rdiscrete(n = nrow(matches), values = 0:3, probs=c(p0, p1, p2, p3)))
+  for (i in n:N){
+    if (matches$ah.res[i] == "hm"){matches$rand.Ret.AHH[i] <- (matches$BbAvAHH[i]-1) * matches$rand.Bet.AHH[i]}
+    else if (matches$ah.res[i] == "hfhm"){matches$rand.Ret.AHH[i] <- (matches$BbAvAHH[i]-1) * 0.5 * matches$rand.Bet.AHH[i] - (0.5 * matches$rand.Bet.AHH[i])}
+    else{matches$rand.Ret.AHH[i] <- -matches$rand.Bet.AHH[i]}}
+  
+  matches$rand.CumR.AHH <- with(matches, 0)
+  matches$rand.CumR.AHH[n] <- matches$rand.Ret.AHH[n]
+  for (i in n:N){matches$rand.CumR.AHH[i] <- matches$rand.CumR.AHH[i-1] + matches$rand.Ret.AHH[i]}
+  
+  lines(matches$BetIndex, matches$rand.CumR.AHH, col=alpha("blue", alpha0), type='l')
+}
+lines(matches$BetIndex, matches$C.AHHReturns, col = alpha("red"), type = 'l')
+lines(matches$BetIndex, matches$C.AHHRet.alt, col = alpha("green"), type = 'l')
+legend(0, -2500, c('Our Method', 'Alternate', 'Random'), lty=c(1,1,1), col=c('red', 'green', 'blue'))
+
+#AH Away
+plot(matches$BetIndex, matches$C.AHAReturns, col = alpha("red"), type = 'l', ylim = c(-3000, 10), xlab = 'Index', ylab = 'Returns', main = 'AH Away Win')
+for (i in 1:nRuns){
+  p1 <- nrow(matches[matches$AHAwayBet == 1,]) / nrow(matches[(n+1):N,])
+  p2 <- nrow(matches[matches$AHAwayBet == 2,]) / nrow(matches[(n+1):N,])
+  p3 <- nrow(matches[matches$AHAwayBet == 3,]) / nrow(matches[(n+1):N,])
+  p0 <- 1 - (p1 + p2 + p3)
+  
+  #Reset the random bet, AH Away
+  matches$rand.Bet.AHA <- with(matches, 0); matches$rand.Ret.AHA <- with(matches, 0)
+  matches$rand.Bet.AHA <- with(matches, rand.Bet.AHA + rdiscrete(n = nrow(matches), values = 0:3, probs=c(p0, p1, p2, p3)))
+  for (i in n:N){
+    if (matches$ah.res[i] == "aw"){matches$rand.Ret.AHA[i] <- (matches$BbAvAHA[i]-1) * matches$rand.Bet.AHA[i]}
+    else if (matches$ah.res[i] == "hfaw"){matches$rand.Ret.AHA[i] <- (matches$BbAvAHA[i]-1) * 0.5 * matches$rand.Bet.AHA[i] - (0.5 * matches$rand.Bet.AHA[i])}
+    else{matches$rand.Ret.AHA[i] <- -matches$rand.Bet.AHA[i]}}
+  
+  matches$rand.CumR.AHA <- with(matches, 0); matches$rand.CumR.AHA[n] <- matches$rand.Ret.AHA[n]
+  for (i in n:N){matches$rand.CumR.AHA[i] <- matches$rand.CumR.AHA[i-1] + matches$rand.Ret.AHA[i]}
+  
+  lines(matches$BetIndex, matches$rand.CumR.AHA, col=alpha("blue", alpha0), type='l')
+}
+lines(matches$BetIndex, matches$C.AHAReturns, col = alpha("red"), type = 'l')
+lines(matches$BetIndex, matches$C.AHARet.alt, col = alpha("green"), type = 'l')
+legend(0, -2500, c('Our Method', 'Alternate', 'Random'), lty=c(1,1,1), col=c('red', 'green', 'blue'))
+
+par(mfrow = c(1, 1)) #Reset graphical parameters
+```
+
+Whilst the proposed algorithm makes a loss, it is significantly better than the RBS, with the most significant improvements coming in the AH market. 
+
+Interestingly, the line for the RBS returns in the AH market had far less variation than the 1X2 market, which could suggest that, unless the bettor has a set strategy and/or insider knowledge, a loss of around 17.7% is inevitable.
+
+In the 1X2 market, despite vast decreases in accuracy (the RBS for the Home Win market was 19% less accurate; the Away Win market was 17% less accurate), the final winnings were not as poor as in the AH markets, with 2.8% and 4.7% larger losses. The proposed algorithm always finishes more profitable than the RBS, however.
+
+## 4.5 Conclusion
+
+The proposed algorithm outperforms the random bet strategy. In order to improve the results, with an aim to create a profit, however, more advanced methods, such as utilising maximum odds on offer for a match, vast amounts of data, or insider knowledge are required. It has been shown that a high level of accuracy doesn’t equate to winnings, or that a vastly lower accuracy results in much lower profit. In addition, it was shown that the Asian Handicap market was harder to make winnings from than the 1X2 market, without either a being knowledgeable bettor, and/or utilising a more advanced model.
+
+# 5. Conclusion
+
+## 5.1 The 1X2 Market {.unlisted}
+
+It has been shown that the bookmaker accuracy is high in the 1X2 Home Win and Away Win markets, based on visual analyses, and five measures of statistical accuracy. Bookmakers, however, struggle with the prediction of Draws, and opt to use a ‘safe’ method of setting relatively constant odds (the consensus probabilities have a low standard deviation), set to reflect the actual probability of a Draw occurring (approximately between 0.25 and 0.27, changing over time and across leagues). These findings are as expected. What is, perhaps, more unexpected is in the English & Scottish pyramid analysis, bookmaker accuracy in all four measures was worse in the Level 2 group of leagues (English Leagues One and Two; Scottish Championship) than in the Level 3 group (English National League; Scottish Leagues One and Two).
+
+## 5.2 The Under/Over 2.5 Goals Market {.unlisted}
+
+The UO market was shown to exhibit poor levels of accuracy from bookmakers, with an $R^2$ of 38.7% and RMSE of 0.1478. It was shown to be improving over time, with four $R^2$ values greater than 75% in the last five seasons considered. $P_1$ and $P_2$ steadily improved too, with the former rising from 0.5020 to 0.5039, and the latter decreasing from 0.4960 to 0.4923.
+
+## 5.3 The Asian Handicap Market
+
+It was shown the handicap is well placed and is improving over time (the variance in odds offered is reducing, and approaching 0.5, ideal AH odds). However, the market performance appears to be decreasing over time, with $R^2$ decreasing (in 2005/06, $R^2$ = 81% to, in 2019/20, $R^2$ = 53%), RMSE increasing (0.1568 to 0.1605). The P-values appear to be worsening over time, too, with $P_1$ dropping from 0.5026 to 0.5006, and $P_2$ rising from 0.4948 to 0.4988. These values, however, still indicate slightly better performance in this market than in the UO market: the $R^2$ and RMSE values may be unreliable due to the lower variation in consensus probabilities making a linear model unsuitable. Between levels, bookmakers performed best in Level 1, across all four variables, followed by Levels 2 and 3, with a decrease in $R^2$ and $P_1$, and an increase in RMSE and $P_2$.
+
+## 5.4 The Effect of Competitive Balance
+
+Competitive balance affects bookmaker accuracy. Three measures were used to quantify competitive balance; it was shown in leagues where balance is high (such as the French Ligue Une and German Bundesliga), bookmakers, whilst performing highly, performed relatively worse than in leagues where balance is low (Portuguese Primiera Liga).  
+
+## 5.5 Bookmaker Overround
+
+Bookmakers set a higher overround at lower levels; this is more evident in the 1X2 and UO markets. Over time, the overround is reducing in these two markets, whilst remaining stable in the AH market. It was found the AH handicap choice is improving, as the variation of consensus probabilities (and hence, odds offered) is reducing, and concentrating around 0.5.  
+
+## 5.6 Findings from the Proposed Betting Algorithm
+
+
+Whilst it did not perform as well as hoped, and ultimately made a loss in all four markets, a con- nection was made between the percentage of bets won, and the actual winnings of the bets. The algorithm won more bets than the successful method proposed by [Kaunitz, Zhong, and Kreiner (2017)](https://arxiv.org/ftp/arxiv/papers/1710/1710.02824.pdf) yet lost a much greater percentage. To win money whilst betting, bettors without ‘insider’ knowledge therefore likely require large amounts of data [Godin et al., 2014](https://fredericgodin.com/wp-content/uploads/2019/03/Beating-the-bookmakers-leveraging-statistics-and-Twitter-microposts-for-predicting-soccer-results.pdf) or advanced mathematical tools ([Dixon and Coles, 1997](https://rss.onlinelibrary.wiley.com/doi/pdfdirect/10.1111/1467-9876.00065?casa_token=n1sttcmr40kAAAAA:2OJ_SvAfZFSuD3jcSLeca6y-Zdxl_sdNFzijX8ktfkLscj9tAEmp_JE7Ueh9YfpTLc8YPFXqq5O_fB0); [Owen, 2009](https://watermark.silverchair.com/dpq018.pdf?token=AQECAHi208BE49Ooan9kkhW_Ercy7Dm3ZL_9Cf3qfKAc485ysgAAArQwggKwBgkqhkiG9w0BBwagggKhMIICnQIBADCCApYGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMI1nXGpYAnrjszOKRAgEQgIICZzzlBo5qDlcUbrBAXzb1Q8pkF-PBHjSSRu31k4kMBaopIZWM2j5INxRvDj1TiuQhMPIEw6eRTUm2MiT405m7DfbXbwC55UIFCycW5todvyxRMHdfmTpg6hc8rrRokigTuytYzjl0u5TvezNTdlV762tnttO4dKyz67OgGMJPT08r9EpWn-_Jf5gUIV8JXG8se-m3T9mOgzRDFlOrxceAxyTtDJNZW5NcGIZpDktMEByMQtV5zYZXf-DJ9cBZ0VXFOKGxoaw8LXOAhTMIzVEd81LKHC-AYFH3w0g-iv7ZSpx9X-lxiPDtKpJ9i_ss73CCy5aSVwCwg0KtcfZ1mEvSdC3dW3xAZvah3_bxv1_n2fh0d4Xblmy850-gpbBrRs9QIuY5s-yy1Op-xvqmd324c5u2VyLQVIdOee3hrP0Ax9pb5gB60zMjUOWtKu_vH1ab_qAKaB8Xo4e4Svn8ldHgWDb1uWHNqDzs42AK0NRNNVU8N0z9rppWYyMqE1e_0UfL3-LRqR6YXYtDoGnEKAncZKXWidgf6E6WsJrXObHjlVOahSokuoZTJfyFD2p_CrPGHFDL6R34baiia47FBuV9lPb1ip5SKk-ZsfGtB6bJIfUjMr-T4Kk7tzBVcO63Cor3aGGxs2PIzJkYJOl5hqpLSLvd5wk9k4WQMW1wPV3qu6WRbRVlif0fNDNyuHjxlzSLiOj3KWpZYhHSZG_l7Oth3o0-oKJs8eqyJU0K2sjx3KPNxYYG8WpNhq7XtEVKfVSwi022gTr1CjYDQwCIvbdirR26-sHxEscSjRVNjCHjho4Cttl1TtObxw"); [Karlis and Ntzoufras, 2009](https://watermark.silverchair.com/dpn026.pdf?token=AQECAHi208BE49Ooan9kkhW_Ercy7Dm3ZL_9Cf3qfKAc485ysgAAArUwggKxBgkqhkiG9w0BBwagggKiMIICngIBADCCApcGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMadwLlyEjqZGAzn2RAgEQgIICaJzGbhH35PtCfWZ-Z5ZgJFdPa85iEdVBcntLqwEnKSWBI0mY5cJRsBuZ-_VSwcOJL-p8H5GWsGAf2YMwfzS8Z5-QkgpdqwHfsOfyNsOwW6oPDwmX-d_rUpbrX7odr2ZkaSkyxQlfmEgRGvV8x8KzIstNIyD3cyXB1eHpjr0o2d-X_h-MrCv_mf4Gq-o9W-ASKz4ixNxdkRaZ6xETTygyNbhuGwCw0VXWl1EkMMhp2aphtf8bZHYqk5xJPkHR_TesxqV7AU94KfYFTUZItYRY-w6DrcxfyX5ngXwbZMNl74o1qQClxFsFJTTSIP1R80-TeZ4wvoYb6FtP9_XYQeRUGvGbG7ATBJWN-yWDn1oVQr9nw2fDzTImEa4P1P6Tm_4JO7xIFd_vgtJF_rkuBJunJVsyleLCtE76uscv_acMNMWmh7bWvZBW56NczWUFrAKg7eE9dLlA9EzxTc-qLgpnLML4H4ZjnWwZCvVus2diHEQAIUcpMLMxzZ3J60dV9wlmTrcOLyHmvf07nJcdYIadsOoNGZjDa4WYvaAI-gnTe1OxF6gmvqpbGXqWNAvOjEPhZWJJSEQVDnwL4FRWrICsA53Mn4G9IcKGCqpxrQSZ0ESxZpZfSzUyU3WysXXt9AMKqKNmDV1nVcl6rCZTnng0u8w-fRrs66SzsIW3pbm2_iiMNdZQ646oV451hhLOz3SkqSJtTiuGaj5WKD-brbAdtbY-LXy4dhNmgnYd93R8LPTZoxgKt3l62UCfC78gxvCUxvNCxx4do3otCtLkLjqRTmftOsXjKRqeyKxgkI5R5sVUnovGAhPvo4Q); [Constantinou, 2020](https://arxiv.org/ftp/arxiv/papers/2003/2003.09384.pdf).
+
+# Thank you
+
+Thank you for taking the time to read this. For more of my projects, [click here](http://jep00.github.io/projects.html), or feel free to [email me](mailto:josephpym@outlook.com).
+
+
