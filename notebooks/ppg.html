@@ -270,8 +270,7 @@ for (i in seasons){
     matchdataTemp &lt;- matchdataTemp[ ,c(&quot;Div&quot;, &quot;Date&quot;, &quot;HomeTeam&quot;, &quot;AwayTeam&quot;, &quot;FTHG&quot;, &quot;FTAG&quot;, &quot;FTR&quot;)]
     matchdata &lt;- rbind(matchdata, matchdataTemp)
   }
-}
-matchdata &lt;- na.omit(matchdata)</code></pre>
+}</code></pre>
 </div>
 <div id="point-and-match-data" class="section level1">
 <h1>Point and Match Data</h1>
@@ -344,7 +343,7 @@ for (i in 1:nrow(pointdata)){
 pointdata &lt;- pointdata[order(-pointdata$ppg),]
 #Positions
 rownames(pointdata) &lt;- 1:nrow(pointdata)
-pointdata</code></pre>
+pointdata[1:104,]</code></pre>
 <pre><code>##                   team games   W   D   L points gFor gAgainst gDiff   ppg
 ## 1             Man City   377 259  58  60    835  870      329   541 2.215
 ## 2           Man United   378 214  88  76    730  673      380   293 1.931

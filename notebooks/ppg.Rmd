@@ -27,7 +27,6 @@ for (i in seasons){
     matchdata <- rbind(matchdata, matchdataTemp)
   }
 }
-matchdata <- na.omit(matchdata)
 ```
 
 # Point and Match Data
@@ -109,7 +108,7 @@ for (i in 1:nrow(pointdata)){
 pointdata <- pointdata[order(-pointdata$ppg),]
 #Positions
 rownames(pointdata) <- 1:nrow(pointdata)
-pointdata
+pointdata[1:104,]
 ```
 
 

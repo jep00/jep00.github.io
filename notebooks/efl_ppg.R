@@ -10,7 +10,7 @@ for (i in seasons){
     matchdata <- rbind(matchdata, matchdataTemp)
   }
 }
-matchdata <- na.omit(matchdata)
+#matchdata <- na.omit(matchdata)
 
 pointdata <- NULL
 for (i in unique(matchdata$HomeTeam)){
