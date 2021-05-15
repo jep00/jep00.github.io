@@ -40,14 +40,13 @@ for (i in unique(matchdata$HomeTeam)){
   pointdata <- rbind(pointdata, i)
 }
 pointdata <- data.frame(pointdata)
-pointdata$points <- with(pointdata, 0)
 pointdata$games <- with(pointdata, 0)
-
 pointdata$W <- with(pointdata, 0)
 pointdata$D <- with(pointdata, 0)
 pointdata$L <- with(pointdata, 0)
+pointdata$points <- with(pointdata, 0)
 
-colnames(pointdata) <- c("team", "points", "games", "W", "D", "L")
+colnames(pointdata) <- c("team", "games", "W", "D", "L", "points")
 rownames(pointdata) <- 1:nrow(pointdata)
 
 for (i in 1:nrow(pointdata)){
