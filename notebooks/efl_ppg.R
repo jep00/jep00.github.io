@@ -1,20 +1,3 @@
----
-title: "EPL PPG over the last 10 years"
-author: "Joseph Pym"
-output:
-  html_document:
-    toc: yes
-    toc_depth: 5
-    toc_float: yes
----
-
-# Welcome
-
-This is a very simple R code to see the Points Per Game achieved by each team in the English Football League over the past 10 years, inspired by a [tweet](https://twitter.com/LawrenceTanner1/status/1393240204438347780) I saw about AFC Wimbledon's record. First, we need to load the data, which we do from [football-data.co.uk](http://www.football-data.co.uk). 
-
-# Loading the Data
-
-```{r loaddata}
 library(dplyr)
 
 co.we <- c("E0", "E1", "E2", "E3")  #Website country codes (football-data)
@@ -28,13 +11,7 @@ for (i in seasons){
   }
 }
 matchdata <- na.omit(matchdata)
-```
 
-# Point and Match Data
-
-Next, we need to find the point data, which we do by first using the Unique tool from the dplyr package to find all unique team names and creating a new dataframe with these. For each row in the PointData dataframe, we compare against each row in the MatchData dataframe: this code checks if the Home Team or Away Team is the team of interest, and if so, allocates points (3 for a win, 1 for a draw). In addition, we find the total number of wins, draws, and losses for each side.
-
-```{r pointdata}
 pointdata <- NULL
 for (i in unique(matchdata$HomeTeam)){
   pointdata <- rbind(pointdata, i)
@@ -74,13 +51,8 @@ for (i in 1:nrow(pointdata)){
     }
   }
 }
-```
 
-# Goal Difference
-
-Similarly, to find each side's goal difference, we use a similar method to locate the matches each team is involved in.
-
-```{r goaldiff}
+#Goal difference
 pointdata$gFor <- with(pointdata, 0)
 pointdata$gAgainst <- with(pointdata, 0)
 for (i in 1:nrow(pointdata)){
@@ -95,13 +67,8 @@ for (i in 1:nrow(pointdata)){
   }
 }
 pointdata$gDiff <- with(pointdata, gFor - gAgainst)
-```
 
-# Final Table
-
-Finally, we find each teams Points Per Game, and re-number the table to reflect an actual league table.
-
-```{r ppg}
+#Final Table
 pointdata$ppg <- with(pointdata, 0)
 for (i in 1:nrow(pointdata)){
   pointdata$ppg[i] <- round(pointdata$points[i] / pointdata$games[i],3)
@@ -111,13 +78,6 @@ pointdata <- pointdata[order(-pointdata$ppg),]
 #Positions
 rownames(pointdata) <- 1:nrow(pointdata)
 pointdata
-```
-
-
-
-
-
-
 
 
 
