@@ -1,7 +1,7 @@
 library(dplyr)
 
 co.we <- c("E0", "E1", "E2", "E3")  #Website country codes (football-data)
-seasons <- c("1112", "1213", "1314", "1415", "1516", "1617", "1718", "1819", "1920", "2021")
+seasons <- c("1112", "1213", "1314", "1415", "1516", "1617", "1718")
 matchdataTemp <- NULL; matchdata <- NULL
 for (i in seasons){
   for (j in 1:4){
