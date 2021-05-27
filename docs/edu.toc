@@ -1,4 +1,4 @@
-\contentsline {section}{\numberline {1}Coventry University}{2}{section.1}
+\contentsline {section}{\numberline {1}Bachelor's Degree: Coventry University}{2}{section.1}
 \contentsline {section}{\numberline {2}A Levels: Hutton Grammar Sixth Form}{4}{section.2}
 \contentsline {section}{\numberline {3}GCSEs: Hutton Grammar School}{5}{section.3}
 \contentsline {section}{\numberline {4}Other Qualifications}{6}{section.4}

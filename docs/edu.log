@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.19 (TeX Live 2018) (preloaded format=pdflatex 2018.11.8)  4 MAY 2021 13:10
+This is pdfTeX, Version 3.14159265-2.6-1.40.19 (TeX Live 2018) (preloaded format=pdflatex 2018.11.8)  27 MAY 2021 07:47
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -395,135 +395,88 @@ File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 <covuni.jpg, id=35, 739.8039pt x 512.1534pt>
 File: covuni.jpg Graphic file (type jpg)
 <use covuni.jpg>
-Package pdftex.def Info: covuni.jpg  used on input line 11.
+Package pdftex.def Info: covuni.jpg  used on input line 25.
 (pdftex.def)             Requested size: 129.55792pt x 89.69635pt.
 <covuni_coa.png, id=36, 165.61874pt x 182.18062pt>
 File: covuni_coa.png Graphic file (type png)
 <use covuni_coa.png>
-Package pdftex.def Info: covuni_coa.png  used on input line 12.
+Package pdftex.def Info: covuni_coa.png  used on input line 26.
 (pdftex.def)             Requested size: 81.54054pt x 89.69635pt.
 
-Underfull \hbox (badness 10000) in paragraph at lines 29--29
-[]\OT1/cmr/m/n/10 A169ACC: In-tro-duc-tion to Book-
- []
-
-
-Underfull \hbox (badness 1221) in paragraph at lines 30--30
-[]\OT1/cmr/m/n/10 103MP: Math-e-mat-i-cal and Nu-mer-i-cal
- []
-
-
-Underfull \hbox (badness 3291) in paragraph at lines 31--31
-[]\OT1/cmr/m/n/10 (Mechanics); Use of
- []
-
-
-Overfull \hbox (4.47939pt too wide) in paragraph at lines 33--34
-[]\OT1/cmr/bx/n/10 80.85%| 
- []
-
-
-Overfull \hbox (3.94507pt too wide) in paragraph at lines 21--36
-[]\OT1/cmr/m/n/10 Currently a stu-dent at Coven-try Uni-ver-sity, study-ing Mat
-h-e-mat-ics and Statis-
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 21--36
+Underfull \hbox (badness 10000) in paragraph at lines 35--39
 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 21--36
+Underfull \hbox (badness 10000) in paragraph at lines 35--39
 
  []
 
 
-Overfull \hbox (0.51205pt too wide) in paragraph at lines 21--36
-[]  
+Underfull \hbox (badness 10000) in paragraph at lines 35--39
+
  []
 
-[2 <./covuni.jpg> <./covuni_coa.png>]
-Underfull \hbox (badness 10000) in paragraph at lines 46--46
-[]\OT1/cmr/m/n/10 Graph The-ory and
- []
-
-
-Overfull \hbox (4.47939pt too wide) in paragraph at lines 48--49
-[]\OT1/cmr/bx/n/10 79.27%| 
- []
-
-
-Overfull \hbox (0.51205pt too wide) in paragraph at lines 38--51
-[]  
- []
-
-
-Underfull \hbox (badness 4242) in paragraph at lines 56--56
-[]\OT1/cmr/m/n/10 Use of Python and
- []
-
-
-Overfull \hbox (0.51205pt too wide) in paragraph at lines 52--66
-[]  
- []
-
-[3]
-<hgs.jpg, id=50, 401.5pt x 401.5pt>
+[2 <./covuni.jpg> <./covuni_coa.png>] [3]
+<hgs.jpg, id=49, 401.5pt x 401.5pt>
 File: hgs.jpg Graphic file (type jpg)
 <use hgs.jpg>
-Package pdftex.def Info: hgs.jpg  used on input line 73.
+Package pdftex.def Info: hgs.jpg  used on input line 82.
 (pdftex.def)             Requested size: 89.69644pt x 89.69635pt.
 
-Underfull \hbox (badness 10000) in paragraph at lines 81--93
+Underfull \hbox (badness 10000) in paragraph at lines 90--94
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 90--94
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 90--94
 
  []
 
 [4 <./hgs.jpg>]
 File: hgs.jpg Graphic file (type jpg)
 <use hgs.jpg>
-Package pdftex.def Info: hgs.jpg  used on input line 100.
+Package pdftex.def Info: hgs.jpg  used on input line 107.
 (pdftex.def)             Requested size: 89.69644pt x 89.69635pt.
-
-Underfull \hbox (badness 10000) in paragraph at lines 109--127
-
- []
-
-[5]
-Underfull \hbox (badness 10000) in paragraph at lines 130--134
+ [5]
+Underfull \hbox (badness 10000) in paragraph at lines 137--141
 
  []
 
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 134.
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 141.
 [6]
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 134.
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 141.
  (./edu.aux)
-Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 134.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 134.
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 141.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 141.
 Package rerunfilecheck Info: File `edu.out' has not changed.
-(rerunfilecheck)             Checksum: A128FE216A585B8265D19A0D57803810;242.
-Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 134.
+(rerunfilecheck)             Checksum: D98046A43872D3CD240AE01A3B4E827A;261.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 141.
  ) 
 Here is how much of TeX's memory you used:
  7691 strings out of 492649
  114812 string characters out of 6129622
- 212820 words of memory out of 5000000
+ 208820 words of memory out of 5000000
  11486 multiletter control sequences out of 15000+600000
  11542 words of font info for 45 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 36i,9n,38p,394b,324s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 36i,9n,38p,480b,324s stack positions out of 5000i,500n,10000p,200000b,80000s
 </usr/local/texlive/2018/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb
 ></usr/local/texlive/2018/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb>
 </usr/local/texlive/2018/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></
 usr/local/texlive/2018/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></us
 r/local/texlive/2018/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb></usr/
-local/texlive/2018/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/loc
-al/texlive/2018/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/loca
-l/texlive/2018/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb>
-Output written on edu.pdf (6 pages, 1034090 bytes).
+local/texlive/2018/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/l
+ocal/texlive/2018/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb>
+Output written on edu.pdf (6 pages, 1022159 bytes).
 PDF statistics:
- 94 PDF objects out of 1000 (max. 8388607)
- 73 compressed objects within 1 object stream
+ 90 PDF objects out of 1000 (max. 8388607)
+ 70 compressed objects within 1 object stream
  12 named destinations out of 1000 (max. 500000)
  48 words of extra memory for PDF output out of 10000 (max. 10000000)
 
